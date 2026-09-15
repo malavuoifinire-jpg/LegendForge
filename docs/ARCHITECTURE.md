@@ -160,14 +160,25 @@ richiamata per finalizzare, legge i metadati reali del file dallo storage,
 verifica formato e dimensioni e solo allora crea la riga della mappa. Un file
 caricato ma mai finalizzato resta orfano e viene raccolto.
 
-### ADR-008 — Rilevamento della griglia deterministico e testabile
+### ADR-008 — Rilevamento della griglia deterministico, eseguito nel browser
 
 Il rilevamento lavora su funzioni pure che ricevono un'immagine in scala di
 grigi e restituiscono passo, offset, rotazione e confidenza. Sono verificabili
-con griglie sintetiche generate nei test, senza dipendere da immagini reali. La
-decodifica dell'immagine è un adattatore separato. Il risultato è sempre una
-proposta: la conferma è del Game Master, e una confidenza bassa non viene mai
-accettata da sola.
+con griglie sintetiche generate nei test, senza dipendere da immagini reali.
+
+L'esecuzione avviene nel browser, che ha già l'immagine in memoria e sa
+decodificarla senza librerie aggiuntive. Il server riceve la proposta, ne
+valida gli intervalli e la salva. La scelta è sicura perché la configurazione
+di griglia non è un dato riservato e perché il Game Master conferma comunque:
+un client che mentisse otterrebbe soltanto una griglia sbagliata sulla propria
+scena, e il server rifiuta comunque valori fuori intervallo.
+
+Il guadagno è concreto: nessuna libreria di decodifica immagini dentro la
+funzione serverless, niente immagini che attraversano la rete due volte,
+nessun limite di durata da rispettare su mappe grandi.
+
+Il risultato resta sempre una proposta: la conferma è del Game Master, e una
+confidenza bassa non viene mai accettata da sola.
 
 ### ADR-009 — Le coordinate persistite sono pixel dell'immagine
 
@@ -208,11 +219,46 @@ di dubbio o riconnessione, rilegge lo stato dall'API. Le sottoscrizioni dirette
 alle modifiche delle tabelle non vengono usate: esporrebbero righe intere,
 comprese quelle nascoste.
 
-### ADR-014 — Le migrazioni le applica la pipeline, non una persona
+### ADR-014 — Le migrazioni sono versionate e automatiche, mai manuali
 
-Ogni modifica allo schema è un file nel repository, applicato da GitHub Actions
-con le credenziali salvate come segreti. Nessuno incolla SQL a mano in una
-finestra: ogni cambiamento è tracciabile, ripetibile e reversibile.
+Ogni modifica allo schema è una voce ordinata dentro il codice, applicata in
+transazione e registrata in `schema_migrations`. Nessuno incolla SQL a mano in
+una finestra: ogni cambiamento è tracciabile e ripetibile.
+
+Le migrazioni sono incorporate come costanti invece di essere lette da file
+`.sql` accanto al sorgente: il bundler delle funzioni serverless include solo
+ciò che viene importato, quindi un file di testo non arriverebbe in produzione.
+
+Chi le applica: il processo, al primo avvio dopo un rilascio. La scelta
+alternativa — una pipeline di integrazione continua che si collega al database
+— è preferibile e resta l'obiettivo, ma richiede credenziali di produzione
+depositate nella pipeline; finché non ci sono, l'applicazione all'avvio è
+l'unico modo per tenere lo schema allineato al codice pubblicato senza
+interventi manuali. È idempotente, protetta da un lock a livello di transazione
+(compatibile con il pooler in modalità transazione, dove la connessione può
+cambiare fra un comando e l'altro) e l'esito è visibile in `/api/health`. Se
+fallisce, l'applicazione risponde 503 su tutto tranne il controllo di stato,
+invece di lavorare su uno schema incoerente.
+
+Da rivedere alla milestone 7, spostando l'applicazione nella pipeline.
+
+### ADR-015 — Workspace npm invece di pnpm
+
+pnpm è più veloce e più rigoroso sulle dipendenze fantasma, ma crea un albero
+di `node_modules` a collegamenti simbolici che il bundler delle funzioni
+serverless deve seguire correttamente. Con npm l'albero è piatto e il
+comportamento del bundler è quello previsto dalla piattaforma. In un progetto
+dove il rilascio deve essere prevedibile più che rapido, la scelta va alla
+prevedibilità.
+
+### ADR-016 — Identità applicativa presente fin dalla milestone 1
+
+Il piano collocava l'autenticazione nella milestone 2. Pubblicare però
+significa esporre l'API su un indirizzo raggiungibile da chiunque: un servizio
+aperto, anche se l'indirizzo è poco noto, non è una base su cui costruire. La
+milestone 1 include quindi la fetta minima e reale del modello di accesso — il
+proprietario dell'istanza, il PIN, il codice di recupero, la sessione con
+cookie — mentre inviti, giocatori e ruoli restano alla milestone 2.
 
 ## 6. Flussi principali
 
