@@ -3,3 +3,6 @@ export * from './coordinates/grid.js';
 export * from './coordinates/viewport.js';
 export * from './coordinates/distance.js';
 export * from './rules/ruleset.js';
+export * from './grid-detection/signal.js';
+export * from './grid-detection/detector.js';
+export * from './grid-detection/synthetic.js';
