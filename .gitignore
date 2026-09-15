@@ -9,13 +9,17 @@ build/
 .vercel/
 *.tsbuildinfo
 
-# Ambiente e segreti — non devono mai finire nel repository
+# Ambiente e segreti — non devono mai finire nel repository.
+# I motivi sono ancorati alla radice o al nome completo: un pattern troppo
+# largo come "secrets*" escluderebbe anche sorgenti legittimi.
 .env
 .env.*
 !.env.example
 *.env
-CHIAVI-*.txt
-secrets*
+/CHIAVI-*.txt
+/secrets.env
+/secrets.txt
+/secrets.json
 *.pem
 *.key
 
