@@ -25,7 +25,10 @@ export function getPool(env: ServerEnv): DatabasePool | null {
     max: 2,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 8_000,
-    ssl: env.databaseSslInsecure ? { rejectUnauthorized: false } : { rejectUnauthorized: true },
+    ssl:
+      env.databaseSsl === 'disable'
+        ? false
+        : { rejectUnauthorized: env.databaseSsl === 'require' },
   });
   cachedPool.on('error', () => {
     // Una connessione inattiva caduta non deve abbattere il processo.

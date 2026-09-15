@@ -9,10 +9,12 @@ import { z } from 'zod';
 const schema = z.object({
   databaseUrl: z.string().min(1).optional(),
   /**
-   * Verifica del certificato TLS verso il database. Disattivarla è accettabile
-   * solo per diagnosi temporanee, mai come configurazione stabile.
+   * Modalità TLS verso il database.
+   *  - `require`  : TLS con verifica del certificato. È il default.
+   *  - `insecure` : TLS senza verifica. Solo per diagnosi temporanee.
+   *  - `disable`  : nessun TLS. Solo per un PostgreSQL locale in sviluppo.
    */
-  databaseSslInsecure: z.boolean().default(false),
+  databaseSsl: z.enum(['require', 'insecure', 'disable']).default('require'),
   build: z.string().nullable().default(null),
   region: z.string().nullable().default(null),
   nodeEnv: z.enum(['development', 'test', 'production']).default('development'),
@@ -20,14 +22,10 @@ const schema = z.object({
 
 export type ServerEnv = z.infer<typeof schema>;
 
-function truthy(value: string | undefined): boolean {
-  return value !== undefined && /^(1|true|yes|on)$/i.test(value);
-}
-
 export function readEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
   return schema.parse({
     databaseUrl: source.DATABASE_URL ?? source.SUPABASE_DB_POOLED_URL ?? undefined,
-    databaseSslInsecure: truthy(source.DATABASE_SSL_INSECURE),
+    databaseSsl: source.DATABASE_SSL ?? undefined,
     build: source.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
     region: source.VERCEL_REGION ?? null,
     nodeEnv: (source.NODE_ENV as ServerEnv['nodeEnv']) ?? 'development',

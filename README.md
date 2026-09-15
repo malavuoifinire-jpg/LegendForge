@@ -73,7 +73,7 @@ Variabili d'ambiente richieste dalle funzioni:
 | Variabile | Uso |
 |---|---|
 | `DATABASE_URL` | stringa di connessione PostgreSQL, quella del pooler in modalità transazione |
-| `DATABASE_SSL_INSECURE` | solo per diagnosi temporanee: disattiva la verifica del certificato |
+| `DATABASE_SSL` | `require` (default), `insecure` per diagnosi temporanee, `disable` per un PostgreSQL locale |
 
 ## Documentazione
 
