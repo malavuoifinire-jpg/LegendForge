@@ -1,0 +1,39 @@
+# Dipendenze
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+build/
+.next/
+.vercel/
+*.tsbuildinfo
+
+# Ambiente e segreti — non devono mai finire nel repository
+.env
+.env.*
+!.env.example
+*.env
+CHIAVI-*.txt
+secrets*
+*.pem
+*.key
+
+# Test e strumenti
+coverage/
+playwright-report/
+test-results/
+.turbo/
+
+# Dati locali
+var/
+storage-data/
+supabase/.temp/
+
+# Sistema operativo ed editor
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/*
+!.vscode/extensions.json
