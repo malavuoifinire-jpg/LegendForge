@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Health } from '@legendforge/contracts';
-import { ApiError, fetchHealth } from '../api/client';
+import { ApiError, api } from '../api/client';
 
 type State =
   | { phase: 'loading' }
@@ -13,7 +13,7 @@ export function StatusPanel() {
   const load = useCallback(async () => {
     setState({ phase: 'loading' });
     try {
-      setState({ phase: 'ready', health: await fetchHealth() });
+      setState({ phase: 'ready', health: await api.health() });
     } catch (error) {
       setState({
         phase: 'error',
@@ -39,15 +39,7 @@ export function StatusPanel() {
       </header>
 
       {state.phase === 'loading' && <p className="panel__hint">Verifica in corso…</p>}
-
-      {state.phase === 'error' && (
-        <p className="panel__hint panel__hint--bad">
-          {state.message}
-          <br />
-          In sviluppo locale le funzioni non girano con <code>vite</code> da solo.
-        </p>
-      )}
-
+      {state.phase === 'error' && <p className="panel__hint panel__hint--bad">{state.message}</p>}
       {state.phase === 'ready' && <HealthView health={state.health} />}
     </section>
   );
@@ -55,10 +47,15 @@ export function StatusPanel() {
 
 function HealthView({ health }: { health: Health }) {
   const db = health.database;
+  const migrations = health.migrations;
   return (
     <dl className="kv">
-      <Row label="API" value={health.status === 'ok' ? 'attiva' : 'degradata'} tone={health.status === 'ok' ? 'good' : 'warn'} />
-      <Row label="Schema" value={`v${health.apiSchemaVersion}`} />
+      <Row
+        label="API"
+        value={health.status === 'ok' ? 'attiva' : 'degradata'}
+        tone={health.status === 'ok' ? 'good' : 'warn'}
+      />
+      <Row label="Schema API" value={`v${health.apiSchemaVersion}`} />
       <Row label="Build" value={health.build ?? 'locale'} />
       <Row label="Region" value={health.region ?? '—'} />
       <Row
@@ -75,10 +72,18 @@ function HealthView({ health }: { health: Health }) {
       {db.serverVersion && <Row label="Versione" value={db.serverVersion} />}
       <Row
         label="Migrazioni"
-        value={db.migrationsApplied === null ? 'nessuna ancora applicata' : String(db.migrationsApplied)}
-        tone={db.migrationsApplied === null ? 'warn' : 'good'}
+        value={
+          migrations.ok
+            ? `${db.migrationsApplied ?? 0} su ${migrations.expected} applicate`
+            : 'non applicate'
+        }
+        tone={migrations.ok ? 'good' : 'bad'}
       />
-      {db.error && <Row label="Errore" value={db.error} tone="bad" />}
+      {migrations.appliedNow.length > 0 && (
+        <Row label="Appena applicate" value={migrations.appliedNow.join(', ')} tone="good" />
+      )}
+      {migrations.error && <Row label="Errore schema" value={migrations.error} tone="bad" />}
+      {db.error && <Row label="Errore database" value={db.error} tone="bad" />}
       <Row label="Ora del server" value={new Date(health.serverTime).toLocaleTimeString('it-IT')} />
     </dl>
   );

@@ -1,7 +1,9 @@
 import { API_SCHEMA_VERSION, type Health } from '@legendforge/contracts';
-import { getPool } from '../db.js';
+import type { DatabasePool } from '../db.js';
 import type { ServerEnv } from '../env.js';
 import type { Route } from '../http.js';
+import type { MigrationOutcome } from '../migrations/run.js';
+import { MIGRATIONS } from '../migrations/index.js';
 
 interface DatabaseProbe {
   configured: boolean;
@@ -13,15 +15,11 @@ interface DatabaseProbe {
 }
 
 /**
- * Verifica reale della connessione al database.
- *
- * Non è un valore finto: esegue una query e riporta latenza, versione del
- * server e numero di migrazioni applicate. Se la tabella delle migrazioni non
- * esiste ancora, il conteggio è null — non zero, che significherebbe un'altra
- * cosa.
+ * Verifica reale della connessione: esegue una query e riporta latenza,
+ * versione del server e migrazioni registrate. Se la tabella delle migrazioni
+ * non esiste, il conteggio è null — non zero, che significherebbe altro.
  */
-async function probeDatabase(env: ServerEnv): Promise<DatabaseProbe> {
-  const pool = getPool(env);
+async function probeDatabase(pool: DatabasePool | null): Promise<DatabaseProbe> {
   if (!pool) {
     return {
       configured: false,
@@ -37,7 +35,7 @@ async function probeDatabase(env: ServerEnv): Promise<DatabaseProbe> {
   try {
     const { rows } = await pool.query<{ version: string }>('SELECT version() AS version');
     const latencyMs = Date.now() - startedAt;
-    const serverVersion = rows[0]?.version ?? null;
+    const raw = rows[0]?.version ?? null;
 
     let migrationsApplied: number | null = null;
     try {
@@ -46,7 +44,6 @@ async function probeDatabase(env: ServerEnv): Promise<DatabaseProbe> {
       );
       migrationsApplied = migrations.rows[0]?.count ?? 0;
     } catch {
-      // La tabella non esiste ancora: nessuna migrazione è stata applicata.
       migrationsApplied = null;
     }
 
@@ -54,7 +51,7 @@ async function probeDatabase(env: ServerEnv): Promise<DatabaseProbe> {
       configured: true,
       reachable: true,
       latencyMs,
-      serverVersion: serverVersion ? serverVersion.split(' on ')[0] ?? serverVersion : null,
+      serverVersion: raw ? (raw.split(' on ')[0] ?? raw) : null,
       migrationsApplied,
       error: null,
     };
@@ -70,26 +67,33 @@ async function probeDatabase(env: ServerEnv): Promise<DatabaseProbe> {
   }
 }
 
-export function healthRoutes(env: ServerEnv): Route[] {
+export function healthRoutes(
+  env: ServerEnv,
+  pool: DatabasePool | null,
+  migrations: () => MigrationOutcome | null,
+): Route[] {
   return [
     {
       method: 'GET',
       pattern: '/api/health',
       async handle() {
-        const database = await probeDatabase(env);
+        const database = await probeDatabase(pool);
+        const outcome = migrations();
         const body: Health = {
-          status: database.reachable ? 'ok' : 'degraded',
+          status: database.reachable && (outcome?.ok ?? false) ? 'ok' : 'degraded',
           apiSchemaVersion: API_SCHEMA_VERSION,
           serverTime: new Date().toISOString(),
           build: env.build,
           region: env.region,
           database,
+          migrations: {
+            expected: MIGRATIONS.length,
+            appliedNow: outcome?.applied ?? [],
+            ok: outcome?.ok ?? false,
+            error: outcome?.error ?? (outcome ? null : 'migrazioni non ancora eseguite'),
+          },
         };
-        return {
-          status: 200,
-          headers: { 'Cache-Control': 'no-store' },
-          body,
-        };
+        return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
       },
     },
   ];

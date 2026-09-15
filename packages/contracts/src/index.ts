@@ -78,6 +78,85 @@ export const ruleSetSchema = z.object({
   }),
 });
 
+/* -------------------------------- identita ------------------------------- */
+
+export const PIN_MIN_LENGTH = 6;
+export const PIN_MAX_LENGTH = 64;
+
+/**
+ * Un PIN troppo prevedibile non protegge nulla: rifiutiamo le sequenze banali
+ * al momento della scelta, invece di scoprirlo dopo.
+ */
+export const pinSchema = z
+  .string()
+  .min(PIN_MIN_LENGTH, `Il PIN deve avere almeno ${PIN_MIN_LENGTH} caratteri`)
+  .max(PIN_MAX_LENGTH)
+  .refine((value) => new Set(value).size > 1, 'Il PIN non può essere un carattere ripetuto')
+  .refine((value) => !/^(0123456789|123456789|12345678|1234567|123456|987654321|654321)/u.test(value),
+    'Il PIN non può essere una sequenza banale');
+
+export const viewerSchema = z.object({
+  id: uuidSchema,
+  displayName: z.string(),
+  isOwner: z.boolean(),
+});
+export type Viewer = z.infer<typeof viewerSchema>;
+
+export const sessionStateSchema = z.object({
+  /** True se qualcuno ha già rivendicato questa istanza con un PIN. */
+  instanceClaimed: z.boolean(),
+  viewer: viewerSchema.nullable(),
+});
+export type SessionState = z.infer<typeof sessionStateSchema>;
+
+export const setupInputSchema = z.object({
+  displayName: z.string().trim().min(1).max(80),
+  pin: pinSchema,
+});
+export type SetupInput = z.infer<typeof setupInputSchema>;
+
+export const setupResultSchema = z.object({
+  viewer: viewerSchema,
+  /** Mostrato una sola volta: non viene mai restituito di nuovo. */
+  recoveryCode: z.string(),
+});
+export type SetupResult = z.infer<typeof setupResultSchema>;
+
+export const loginInputSchema = z.object({ pin: z.string().min(1).max(PIN_MAX_LENGTH) });
+export type LoginInput = z.infer<typeof loginInputSchema>;
+
+export const recoverInputSchema = z.object({
+  recoveryCode: z.string().min(1).max(80),
+  newPin: pinSchema,
+});
+export type RecoverInput = z.infer<typeof recoverInputSchema>;
+
+/* -------------------------------- campagne ------------------------------- */
+
+export const MAX_PLAYER_SLOTS = 8;
+
+export const campaignRoleSchema = z.enum(['game_master', 'player']);
+export type CampaignRole = z.infer<typeof campaignRoleSchema>;
+
+export const createCampaignInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  description: z.string().trim().max(2000).optional().default(''),
+  playerSlots: z.number().int().min(1).max(MAX_PLAYER_SLOTS),
+});
+export type CreateCampaignInput = z.infer<typeof createCampaignInputSchema>;
+
+export const campaignSchema = entityMetaSchema.extend({
+  name: z.string(),
+  description: z.string(),
+  playerSlots: z.number().int().min(1).max(MAX_PLAYER_SLOTS),
+  ownerUserId: uuidSchema,
+  ruleSet: ruleSetSchema,
+  /** Ruolo di chi sta guardando dentro questa campagna. */
+  viewerRole: campaignRoleSchema,
+  sceneCount: z.number().int().nonnegative(),
+});
+export type Campaign = z.infer<typeof campaignSchema>;
+
 /* --------------------------------- stato --------------------------------- */
 
 /** Esito del controllo di stato del servizio. */
@@ -96,6 +175,14 @@ export const healthSchema = z.object({
     serverVersion: z.string().nullable(),
     /** Numero di migrazioni applicate, null se la tabella non esiste ancora. */
     migrationsApplied: z.number().int().nullable(),
+    error: z.string().nullable(),
+  }),
+  migrations: z.object({
+    /** Migrazioni previste dal codice in esecuzione. */
+    expected: z.number().int().nonnegative(),
+    /** Applicate durante l'avvio di questa istanza. */
+    appliedNow: z.array(z.string()),
+    ok: z.boolean(),
     error: z.string().nullable(),
   }),
 });

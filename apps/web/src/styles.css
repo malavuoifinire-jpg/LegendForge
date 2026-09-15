@@ -381,3 +381,346 @@ code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
 }
+
+/* ------------------------------ schermate piene --------------------------- */
+
+.app__main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.app__diagnostics {
+  padding: 12px 16px 0;
+  max-width: 560px;
+}
+
+.screen {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+}
+
+.screen__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.screen h1 {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+.screen__lead {
+  color: var(--muted);
+  max-width: 52ch;
+  margin: 0;
+}
+
+.empty {
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  padding: 28px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.primary {
+  background: var(--accent);
+  color: #06232b;
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.primary:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+button {
+  font-family: inherit;
+}
+
+/* --------------------------------- accesso -------------------------------- */
+
+.gate {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.gate__card {
+  width: min(420px, 100%);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 24px;
+}
+
+.brand--large {
+  margin-bottom: 18px;
+}
+
+.brand--large .brand__mark {
+  width: 22px;
+  height: 22px;
+}
+
+.brand--large .brand__name {
+  font-size: 17px;
+}
+
+.gate__card h1 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+
+.gate__lead {
+  color: var(--muted);
+  margin-bottom: 18px;
+}
+
+.gate__error {
+  color: var(--bad);
+  font-size: 12px;
+  margin: 0 0 12px;
+}
+
+.gate__submit {
+  width: 100%;
+  background: var(--accent);
+  color: #06232b;
+  border: none;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 6px;
+}
+
+.gate__submit:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.gate__link {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 12px;
+  margin-top: 12px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field__label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.field input[type='text'],
+.field input[type='password'],
+.field input:not([type]),
+.field textarea {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.field input:focus,
+.field textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.field input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.recovery-code {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 16px;
+  letter-spacing: 0.06em;
+  background: var(--bg);
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  padding: 14px;
+  text-align: center;
+  margin-bottom: 16px;
+  overflow-wrap: anywhere;
+}
+
+/* -------------------------------- campagne -------------------------------- */
+
+.campaign-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.campaign {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.campaign:hover {
+  border-color: var(--accent);
+}
+
+.campaign__name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.campaign__description {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.campaign__meta {
+  color: var(--muted);
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(4, 5, 7, 0.72);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 20;
+}
+
+.modal__card {
+  width: min(440px, 100%);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+}
+
+.modal__card h2 {
+  font-size: 16px;
+  margin-bottom: 16px;
+}
+
+.modal__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.modal__actions button:not(.primary) {
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+/* ------------------------------ schermata tavolo -------------------------- */
+
+.campaign-screen {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.campaign-screen__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.campaign-screen__head h1 {
+  font-size: 19px;
+}
+
+.campaign-screen__head .gate__link {
+  width: auto;
+  margin: 0;
+}
+
+.campaign-screen__scenes {
+  margin-bottom: 16px;
+}
+
+.table {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 14px;
+  min-height: 560px;
+}
+
+.table__stage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.table__toolbar {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.table__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+@media (max-width: 1000px) {
+  .table {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .table__stage {
+    min-height: 60vh;
+  }
+}
