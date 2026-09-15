@@ -62,13 +62,6 @@ export async function claimInstance(
   const client = await pool.connect();
   try {
     await client.query('BEGIN');
-    const claimed = await client.query<{ owner_user_id: string | null }>(
-      'SELECT owner_user_id FROM instance_state WHERE id = true FOR UPDATE',
-    );
-    if (claimed.rows[0]?.owner_user_id) {
-      await client.query('ROLLBACK');
-      return null;
-    }
 
     const inserted = await client.query<{ id: string }>(
       `INSERT INTO users (display_name, pin_hash, recovery_code_hash)
@@ -78,12 +71,27 @@ export async function claimInstance(
     const userId = inserted.rows[0]?.id;
     if (!userId) throw new Error('creazione utente fallita');
 
-    await client.query(
-      `UPDATE instance_state
-          SET owner_user_id = $1, updated_at = now(), version = version + 1
-        WHERE id = true`,
+    // La rivendicazione è un'unica istruzione atomica: crea la riga se manca e
+    // la aggiorna solo se non ha ancora un proprietario. Due richieste
+    // contemporanee non possono quindi ottenere entrambe il possesso, e una
+    // riga assente non porta a un successo apparente con l'istanza ancora
+    // libera. Se non torna nulla, qualcun altro è arrivato prima.
+    const claim = await client.query<{ owner_user_id: string }>(
+      `INSERT INTO instance_state (id, owner_user_id) VALUES (true, $1)
+       ON CONFLICT (id) DO UPDATE
+          SET owner_user_id = EXCLUDED.owner_user_id,
+              updated_at = now(),
+              version = instance_state.version + 1
+        WHERE instance_state.owner_user_id IS NULL
+       RETURNING owner_user_id`,
       [userId],
     );
+
+    if (claim.rowCount !== 1) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
     await client.query('COMMIT');
     return { userId, displayName, recoveryCode };
   } catch (error) {

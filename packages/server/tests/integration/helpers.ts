@@ -32,10 +32,14 @@ export async function createHarness(): Promise<TestHarness> {
     pool,
     app,
     async reset() {
+      // instance_state ha una chiave esterna verso users, quindi CASCADE la
+      // svuota insieme alle altre: la riga singola va ricreata, altrimenti i
+      // test partirebbero da uno stato che in produzione non esiste.
       await pool.query(`
         TRUNCATE tokens, actors, grid_configurations, scenes, map_assets, assets,
-                 campaign_memberships, campaigns, sessions, users RESTART IDENTITY CASCADE`);
-      await pool.query('UPDATE instance_state SET owner_user_id = NULL WHERE id = true');
+                 campaign_memberships, campaigns, sessions, instance_state, users
+        RESTART IDENTITY CASCADE`);
+      await pool.query('INSERT INTO instance_state (id) VALUES (true) ON CONFLICT DO NOTHING');
     },
     async close() {
       await pool.end();
