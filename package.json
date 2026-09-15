@@ -1,0 +1,36 @@
+{
+  "name": "legendforge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:packages": "npm run build -w @legendforge/core -w @legendforge/contracts -w @legendforge/server",
+    "build": "npm run build:packages && npm run build -w @legendforge/web",
+    "dev": "npm run build:packages && npm run dev -w @legendforge/web",
+    "typecheck": "npm run build:packages && npm run typecheck --workspaces --if-present && npm run typecheck:api",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "verify": "npm run lint && npm run typecheck && npm run test && npm run build",
+    "typecheck:api": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "eslint": "^9.39.0",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "^16.5.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.0",
+    "@types/node": "^22.18.9"
+  }
+}
