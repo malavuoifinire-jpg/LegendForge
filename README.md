@@ -61,12 +61,15 @@ eseguibile anche fuori da Vercel.
 
 ```bash
 npm install          # installa le dipendenze del monorepo
-npm run dev          # interfaccia su http://localhost:5173
+npm run dev          # solo interfaccia, con ricarica a caldo, su :5173
+npm run start:local  # interfaccia e API insieme su :3000
 npm run verify       # lint, tipi, test e build, come in integrazione continua
 ```
 
-Le funzioni serverless non girano con `vite` da solo: in locale servono
-`vercel dev`, oppure si usa direttamente l'ambiente di anteprima pubblicato.
+`npm run dev` avvia solo Vite: le chiamate all'API falliscono perché non c'è
+nessuna funzione in ascolto. Per provare il flusso completo si usa
+`npm run start:local`, che serve i file costruiti e monta il router sulla stessa
+origine, esattamente come fa Vercel in produzione.
 
 Variabili d'ambiente richieste dalle funzioni:
 

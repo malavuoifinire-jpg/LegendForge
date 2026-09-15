@@ -40,7 +40,7 @@ export function createDemoMap(): HTMLCanvasElement {
 
   const random = pseudoRandom(20260915);
 
-  ctx.fillStyle = '#15171c';
+  ctx.fillStyle = '#1b1f26';
   ctx.fillRect(0, 0, DEMO_MAP_WIDTH, DEMO_MAP_HEIGHT);
 
   const cell = DEMO_MAP_CELL_PX;
@@ -53,25 +53,25 @@ export function createDemoMap(): HTMLCanvasElement {
     const y = oy + room.y * cell;
     const w = room.w * cell;
     const h = room.h * cell;
-    ctx.fillStyle = '#2e3138';
+    ctx.fillStyle = '#3c434f';
     ctx.fillRect(x, y, w, h);
 
     // Variazione delle lastre, per dare superficie all'immagine
     for (let cy = 0; cy < room.h; cy += 1) {
       for (let cx = 0; cx < room.w; cx += 1) {
-        const shade = 0.06 * random();
+        const shade = 0.085 * random();
         ctx.fillStyle = `rgba(255,255,255,${shade.toFixed(3)})`;
         ctx.fillRect(x + cx * cell, y + cy * cell, cell, cell);
       }
     }
 
-    ctx.strokeStyle = '#0d0e11';
+    ctx.strokeStyle = '#0a0c0f';
     ctx.lineWidth = 6;
     ctx.strokeRect(x - 3, y - 3, w + 6, h + 6);
   }
 
   // Reticolo inciso sul pavimento, con passo noto
-  ctx.strokeStyle = 'rgba(0,0,0,0.42)';
+  ctx.strokeStyle = 'rgba(0,0,0,0.5)';
   ctx.lineWidth = 1.4;
   ctx.beginPath();
   for (let x = ox; x <= DEMO_MAP_WIDTH; x += cell) {
@@ -94,7 +94,7 @@ export function createDemoMap(): HTMLCanvasElement {
     DEMO_MAP_WIDTH * 0.75,
   );
   gradient.addColorStop(0, 'rgba(0,0,0,0)');
-  gradient.addColorStop(1, 'rgba(0,0,0,0.55)');
+  gradient.addColorStop(1, 'rgba(0,0,0,0.42)');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, DEMO_MAP_WIDTH, DEMO_MAP_HEIGHT);
 

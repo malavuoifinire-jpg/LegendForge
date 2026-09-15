@@ -126,7 +126,7 @@ export function App() {
             <h2>Anteprima tecnica</h2>
             <p>
               La mappa qui sotto è generata dal browser e <strong>nulla viene salvato</strong>:
-              ricaricando la pagina tutto torna al punto di partenza. Servono a verificare il
+              ricaricando la pagina tutto torna al punto di partenza. Serve a verificare il
               renderer e la matematica della griglia. Caricamento delle mappe, rilevamento
               automatico e persistenza arrivano con il resto della Milestone 1.
             </p>

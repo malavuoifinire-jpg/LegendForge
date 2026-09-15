@@ -110,6 +110,16 @@ export function SceneCanvas({
     ctx.imageSmoothingEnabled = viewport.zoom < 2;
     ctx.drawImage(map, origin.x, origin.y, map.width * viewport.zoom, map.height * viewport.zoom);
 
+    // Bordo della mappa, per rendere visibile dove finisce
+    ctx.strokeStyle = 'rgba(126, 231, 255, 0.28)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(
+      origin.x - 0.5,
+      origin.y - 0.5,
+      map.width * viewport.zoom + 1,
+      map.height * viewport.zoom + 1,
+    );
+
     // Griglia sovrapposta: mai impressa sull'immagine
     if (gridVisible) drawGrid(ctx, map, grid, viewport, size);
 
