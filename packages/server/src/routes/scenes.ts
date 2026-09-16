@@ -6,6 +6,7 @@ import {
   type Scene,
   type SceneDetail,
   type SceneEvents,
+  type CampaignRole,
 } from '@legendforge/contracts';
 import { DEFAULT_RULE_SET } from '@legendforge/core';
 import { requireCampaignAccess, requireGameMaster, requireSceneAccess } from '../access.js';
@@ -23,6 +24,7 @@ import { controlLevel } from './tokens.js';
 import { parseBody } from '../validate.js';
 import { SELECT_MAPS, SOURCE_URL_SECONDS, toMapAsset } from './maps.js';
 import { visibleTokensForViewer } from './vision.js';
+import type { SceneEvent } from '../events.js';
 
 interface SceneRow {
   id: string;
@@ -83,6 +85,41 @@ const SELECT_SCENES = `
     FROM scenes s
     JOIN grid_configurations g ON g.scene_id = s.id
    WHERE s.deleted_at IS NULL`;
+
+/**
+ * Passa gli aggiornamenti delle pedine dallo stesso filtro della lettura
+ * completa.
+ *
+ * Senza questo passaggio il registro degli eventi sarebbe una porta di
+ * servizio: la scena non consegna una pedina fuori dal campo visivo, ma
+ * l'aggiornamento della sua posizione arriverebbe lo stesso a tutti. Una
+ * pedina che non si vede diventa qui una pedina sparita, che è esattamente
+ * quello che chi guarda ha diritto di sapere.
+ */
+async function filterTokenEvents(
+  context: ServerContext,
+  access: { sceneId: string; role: CampaignRole; campaignId: string },
+  userId: string,
+  events: SceneEvent[],
+): Promise<SceneEvent[]> {
+  if (access.role === 'game_master') return events;
+  if (!events.some((event) => event.kind === 'token.upserted')) return events;
+
+  const { tokens } = await visibleTokensForViewer(context, access.sceneId, userId, access.role);
+  const visible = new Map(tokens.map((token) => [token.id, token]));
+
+  return events.map((event) => {
+    if (event.kind !== 'token.upserted') return event;
+    const incoming = event.payload as { id?: unknown };
+    const id = typeof incoming?.id === 'string' ? incoming.id : null;
+    if (!id) return event;
+    const current = visible.get(id);
+    if (!current) return { ...event, kind: 'token.removed' as const, payload: { id } };
+    // Si consegna lo stato attuale, non quello di quando l'evento è nato: fra
+    // i due potrebbe essere passato altro.
+    return { ...event, payload: current };
+  });
+}
 
 export function sceneRoutes(context: ServerContext): Route[] {
   return [
@@ -321,9 +358,10 @@ export function sceneRoutes(context: ServerContext): Route[] {
 
         const deadline = Date.now() + (wait ? HOLD_MS : 0);
         for (;;) {
-          const events = await readSceneEvents(context.pool, access.sceneId, cursor, visibilities);
-          if (events.length > 0) {
-            const last = events[events.length - 1];
+          const raw = await readSceneEvents(context.pool, access.sceneId, cursor, visibilities);
+          if (raw.length > 0) {
+            const last = raw[raw.length - 1];
+            const events = await filterTokenEvents(context, access, viewer.id, raw);
             const body: SceneEvents = { cursor: last ? last.id : cursor, events };
             return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
           }

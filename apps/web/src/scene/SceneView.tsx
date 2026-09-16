@@ -123,8 +123,18 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
    * sarebbe la propria eco a strapparla di mano.
    */
   const applyEvents = useCallback((events: SceneEvent[]) => {
-    let revisit = false;
-    let moved = false;
+    // Le bandiere si decidono qui, non dentro l'aggiornatore di stato: React
+    // lo esegue quando gli pare, e il controllo in fondo lo troverebbe sempre
+    // a mani vuote. È il motivo per cui il campo visivo restava indietro.
+    const revisit = events.some(
+      (event) =>
+        event.kind === 'wall.changed' ||
+        event.kind === 'light.changed' ||
+        event.kind === 'vision.changed',
+    );
+    const moved = events.some(
+      (event) => event.kind === 'token.upserted' || event.kind === 'token.removed',
+    );
     setScene((current) => {
       if (!current) return current;
       let tokens = current.tokens;
@@ -132,7 +142,6 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
       for (const event of events) {
         if (event.kind === 'token.upserted') {
           const incoming = event.payload as Token;
-          moved = true;
           if (draggingRef.current === incoming.id) continue;
           const index = tokens.findIndex((token) => token.id === incoming.id);
           tokens = index === -1
@@ -140,17 +149,10 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
             : tokens.map((token) => (token.id === incoming.id ? incoming : token));
         } else if (event.kind === 'token.removed') {
           const { id } = event.payload as { id: string };
-          moved = true;
           if (draggingRef.current === id) continue;
           tokens = tokens.filter((token) => token.id !== id);
         } else if (event.kind === 'grid.updated') {
           grid = event.payload as SceneDetail['grid'];
-        } else if (
-          event.kind === 'wall.changed' ||
-          event.kind === 'light.changed' ||
-          event.kind === 'vision.changed'
-        ) {
-          revisit = true;
         }
       }
       tokensRef.current = tokens;

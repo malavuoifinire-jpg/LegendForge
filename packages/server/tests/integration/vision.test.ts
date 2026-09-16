@@ -1003,3 +1003,90 @@ describe('memoria dell esplorato', () => {
     expect(after.exploration!.cells).not.toEqual(before.exploration!.cells);
   });
 });
+
+describe('il registro degli eventi non è una porta di servizio', () => {
+  it('lo spostamento di un mostro fuori dal campo visivo non arriva al giocatore', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 100, y: 300 });
+    await addWalls(scene.id, [{ ax: 300, ay: 0, bx: 300, by: 600 }]);
+    const mostro = await addMonster(scene.id, { x: 500, y: 300 }, 'Ghoul segreto');
+
+    const before = await sceneFor(scene.id, player.cookie);
+    // Il Game Master lo sposta, sempre dietro al muro.
+    const moved = await harness.app.handle(
+      request('PATCH', `/api/tokens/${mostro.id}`, {
+        cookie: gmCookie,
+        body: { version: mostro.version, x: 560, y: 320, snapToGrid: false },
+      }),
+    );
+    expect(moved.status).toBe(200);
+
+    const events = await harness.app.handle(
+      request('GET', `/api/scenes/${scene.id}/events`, {
+        cookie: player.cookie,
+        query: { since: String(before.eventCursor), wait: '0' },
+      }),
+    );
+    const body = events.body as { events: { kind: string; payload: unknown }[] };
+    const serialized = JSON.stringify(body);
+    expect(serialized).not.toContain('Ghoul segreto');
+    expect(serialized).not.toContain('560');
+    // Quello che arriva è: quella pedina non c'è.
+    const about = body.events.filter(
+      (event) => (event.payload as { id?: string })?.id === mostro.id,
+    );
+    expect(about.every((event) => event.kind === 'token.removed')).toBe(true);
+  });
+
+  it('lo spostamento di un mostro in vista arriva con lo stato attuale', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 100, y: 300 });
+    const mostro = await addMonster(scene.id, { x: 200, y: 300 }, 'Ratto visibile');
+
+    const before = await sceneFor(scene.id, player.cookie);
+    const moved = await harness.app.handle(
+      request('PATCH', `/api/tokens/${mostro.id}`, {
+        cookie: gmCookie,
+        body: { version: mostro.version, x: 240, y: 310, snapToGrid: false },
+      }),
+    );
+    expect(moved.status).toBe(200);
+
+    const events = await harness.app.handle(
+      request('GET', `/api/scenes/${scene.id}/events`, {
+        cookie: player.cookie,
+        query: { since: String(before.eventCursor), wait: '0' },
+      }),
+    );
+    const body = events.body as { events: { kind: string; payload: Token }[] };
+    const upsert = body.events.find(
+      (event) => event.kind === 'token.upserted' && event.payload.id === mostro.id,
+    );
+    expect(upsert?.payload.x).toBe(240);
+  });
+
+  it('per il Game Master il registro resta intatto', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 100, y: 300 });
+    await addWalls(scene.id, [{ ax: 300, ay: 0, bx: 300, by: 600 }]);
+    const mostro = await addMonster(scene.id, { x: 500, y: 300 }, 'Ghoul del GM');
+
+    const before = await sceneFor(scene.id, gmCookie);
+    await harness.app.handle(
+      request('PATCH', `/api/tokens/${mostro.id}`, {
+        cookie: gmCookie,
+        body: { version: mostro.version, x: 560, y: 320, snapToGrid: false },
+      }),
+    );
+    const events = await harness.app.handle(
+      request('GET', `/api/scenes/${scene.id}/events`, {
+        cookie: gmCookie,
+        query: { since: String(before.eventCursor), wait: '0' },
+      }),
+    );
+    expect(JSON.stringify(events.body)).toContain('Ghoul del GM');
+  });
+});
