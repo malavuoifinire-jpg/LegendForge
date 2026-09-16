@@ -164,6 +164,12 @@ export type Invite = z.infer<typeof inviteSchema>;
 export const createdInviteSchema = inviteSchema.extend({
   /** Percorso da comporre con l'indirizzo del sito. */
   joinPath: z.string(),
+  /**
+   * Indirizzo completo, quando il servizio conosce il proprio dominio stabile.
+   * Va preferito a `joinPath`: un invito non deve mai puntare all'anteprima di
+   * una pubblicazione.
+   */
+  joinUrl: z.string().nullable(),
   token: z.string(),
 });
 export type CreatedInvite = z.infer<typeof createdInviteSchema>;

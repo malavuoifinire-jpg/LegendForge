@@ -81,15 +81,13 @@ export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
               Questo link compare una volta sola: copialo adesso e mandalo alla persona giusta.
               Chi lo apre entra nella campagna.
             </p>
-            <code className="invite-link">{`${window.location.origin}${fresh.joinPath}`}</code>
+            <code className="invite-link">{inviteUrl(fresh)}</code>
             <div className="wizard__actions">
               <button
                 type="button"
                 className="primary"
                 onClick={() => {
-                  void navigator.clipboard
-                    ?.writeText(`${window.location.origin}${fresh.joinPath}`)
-                    .catch(() => undefined);
+                  void navigator.clipboard?.writeText(inviteUrl(fresh)).catch(() => undefined);
                 }}
               >
                 Copia
@@ -235,6 +233,18 @@ export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
 }
 
 const ACTOR_COLORS = ['#60a5fa', '#4ade80', '#c084fc', '#fbbf24', '#f472b6', '#22d3ee'];
+
+/**
+ * Indirizzo dell'invito.
+ *
+ * Si preferisce sempre quello calcolato dal server, che conosce il dominio
+ * stabile: la pagina da cui si genera l'invito può essere l'anteprima di una
+ * pubblicazione, e un ospite che apre quel link finisce su una schermata di
+ * accesso che non lo riguarda.
+ */
+function inviteUrl(invite: CreatedInvite): string {
+  return invite.joinUrl ?? `${window.location.origin}${invite.joinPath}`;
+}
 
 function inviteLabel(invite: Invite): string {
   switch (invite.status) {

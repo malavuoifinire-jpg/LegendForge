@@ -80,10 +80,14 @@ export function inviteRoutes(context: ServerContext): Route[] {
         });
         // Il token viene restituito adesso e mai più: nel database c'è solo
         // la sua impronta.
+        const joinPath = `/entra/${token}`;
         const body: CreatedInvite = {
           ...toInvite(row),
           token,
-          joinPath: `/entra/${token}`,
+          joinPath,
+          joinUrl: context.env.publicAppOrigin
+            ? `${context.env.publicAppOrigin.replace(/\/+$/u, '')}${joinPath}`
+            : null,
         };
         return { status: 201, headers: { 'Cache-Control': 'no-store' }, body };
       },

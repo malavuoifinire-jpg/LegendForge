@@ -28,6 +28,15 @@ const schema = z.object({
   /** Chiave di servizio: resta sul server, non raggiunge mai il browser. */
   supabaseServiceRoleKey: z.string().min(10).optional(),
   storageBucket: z.string().min(1).default('legendforge-assets'),
+  /**
+   * Indirizzo pubblico e stabile del servizio.
+   *
+   * I link d'invito devono puntare qui, non alla pagina da cui il Game Master
+   * li ha generati: un'anteprima di una pubblicazione ha un indirizzo diverso
+   * a ogni caricamento ed è protetta, quindi un invito costruito da lì porta
+   * gli ospiti su una schermata di accesso che non li riguarda.
+   */
+  publicAppOrigin: z.string().url().optional(),
   /** Limite di dimensione per i file caricati. */
   maxUploadBytes: z.coerce.number().int().positive().default(32 * 1024 * 1024),
   build: z.string().nullable().default(null),
@@ -45,6 +54,12 @@ export function readEnv(source: NodeJS.ProcessEnv = process.env): ServerEnv {
     supabaseUrl: source.SUPABASE_URL ?? undefined,
     supabaseServiceRoleKey: source.SUPABASE_SERVICE_ROLE_KEY ?? undefined,
     storageBucket: source.SUPABASE_STORAGE_BUCKET ?? undefined,
+    publicAppOrigin:
+      source.PUBLIC_APP_ORIGIN ??
+      // Vercel espone da sé il dominio stabile del progetto.
+      (source.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${source.VERCEL_PROJECT_PRODUCTION_URL}`
+        : undefined),
     maxUploadBytes: source.MAX_UPLOAD_BYTES ?? undefined,
     build: source.VERCEL_GIT_COMMIT_SHA?.slice(0, 7) ?? null,
     region: source.VERCEL_REGION ?? null,

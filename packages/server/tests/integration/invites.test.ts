@@ -54,6 +54,9 @@ describe('inviti', () => {
     const invite = await newInvite({ label: 'Tavolo del venerdì' });
     expect(invite.token.length).toBeGreaterThan(30);
     expect(invite.joinPath).toBe(`/entra/${invite.token}`);
+    // Senza un dominio configurato resta il percorso relativo; con PUBLIC_APP_ORIGIN
+    // il server compone l'indirizzo completo (verificato sotto).
+    expect(invite.joinUrl).toBeNull();
 
     const list = await harness.app.handle(
       request('GET', `/api/campaigns/${campaignId}/invites`, { cookie: gm }),
@@ -162,6 +165,22 @@ describe('inviti', () => {
       (await harness.app.handle(request('DELETE', `/api/invites/${invite.id}`, { cookie: player })))
         .status,
     ).toBe(403);
+  });
+});
+
+describe('indirizzo dell invito', () => {
+  it('usa il dominio stabile quando il servizio lo conosce', async () => {
+    const { createApp } = await import('../../src/app.js');
+    const { TEST_ENV } = await import('./helpers.js');
+    const app = createApp(
+      { ...TEST_ENV, publicAppOrigin: 'https://legendforge.example' },
+      harness.pool,
+    );
+    const created = await app.handle(
+      request('POST', `/api/campaigns/${campaignId}/invites`, { cookie: gm, body: {} }),
+    );
+    const invite = created.body as CreatedInvite;
+    expect(invite.joinUrl).toBe(`https://legendforge.example/entra/${invite.token}`);
   });
 });
 
