@@ -162,3 +162,36 @@ describe('utilità sul poligono', () => {
     expect(polygonArea([])).toBe(0);
   });
 });
+
+describe('semplificazione del poligono', () => {
+  it('toglie i vertici in fila senza cambiare quello che si vede', () => {
+    const centro = { x: 100, y: 100 };
+    const muri = stanza();
+    const poligono = computeVisibilityPolygon(centro, muri, {
+      radiusPx: 1000,
+      circleSegments: 360,
+    });
+    // Una stanza quadrata vista dal centro ha quattro angoli: i punti restanti
+    // sono pochi, non trecento.
+    expect(poligono.length).toBeLessThan(20);
+    expect(polygonArea(poligono)).toBeGreaterThan(200 * 200 * 0.98);
+    expect(polygonArea(poligono)).toBeLessThan(200 * 200 * 1.02);
+  });
+
+  it('le coordinate non portano decimali inutili', () => {
+    const poligono = computeVisibilityPolygon({ x: 100, y: 100 }, stanza(), { radiusPx: 1000 });
+    for (const point of poligono) {
+      expect(Math.round(point.x * 10) / 10).toBeCloseTo(point.x, 12);
+      expect(Math.round(point.y * 10) / 10).toBeCloseTo(point.y, 12);
+    }
+  });
+
+  it('un poligono già minimo resta valido', () => {
+    const poligono = computeVisibilityPolygon({ x: 0, y: 0 }, [], {
+      radiusPx: 100,
+      circleSegments: 12,
+    });
+    expect(poligono.length).toBeGreaterThanOrEqual(3);
+    expect(polygonArea(poligono)).toBeGreaterThan(0);
+  });
+});

@@ -55,11 +55,19 @@ export function computeVisibilityPolygon(
   for (let i = 0; i < circleSegments; i += 1) {
     pushAngle((i / circleSegments) * TWO_PI);
   }
+
+  // Gli estremi condivisi si contano una volta sola. In una pianta fatta di
+  // stanze quasi ogni spigolo appartiene a due muri, e lanciare due volte gli
+  // stessi tre raggi raddoppierebbe il lavoro per niente.
+  const seen = new Set<string>();
   for (const wall of relevant) {
     for (const end of [
       { x: wall.ax, y: wall.ay },
       { x: wall.bx, y: wall.by },
     ]) {
+      const key = `${Math.round(end.x * 16)},${Math.round(end.y * 16)}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
       const angle = Math.atan2(end.y - origin.y, end.x - origin.x);
       pushAngle(angle - cornerOffset);
       pushAngle(angle);
@@ -92,7 +100,37 @@ export function computeVisibilityPolygon(
     });
   }
 
-  return points;
+  return simplify(points);
+}
+
+/** Sotto questo scostamento in pixel un vertice non cambia quello che si vede. */
+const SIMPLIFY_TOLERANCE_PX = 0.5;
+
+/**
+ * Toglie i vertici che non dicono niente.
+ *
+ * Il lancio dei raggi ne produce a migliaia, e tre su quattro cadono in fila
+ * sullo stesso muro. Il poligono attraversa la rete fino a ogni giocatore a
+ * ogni passo: mezzo pixel di scostamento non si vede, qualche decina di
+ * kilobyte per movimento sì.
+ */
+function simplify(points: readonly ImagePoint[]): ImagePoint[] {
+  if (points.length < 3) return points.map(round);
+  const kept: ImagePoint[] = [];
+  for (let i = 0; i < points.length; i += 1) {
+    const previous = kept[kept.length - 1] ?? points[points.length - 1];
+    const current = points[i];
+    const next = points[(i + 1) % points.length];
+    if (!previous || !current || !next) continue;
+    if (distanceToSegment(current, previous, next) > SIMPLIFY_TOLERANCE_PX) kept.push(round(current));
+  }
+  // Un poligono ridotto a meno di tre vertici non è più una superficie.
+  return kept.length >= 3 ? kept : points.map(round);
+}
+
+/** Un decimo di pixel basta: il resto è peso sulla rete. */
+function round(point: ImagePoint): ImagePoint {
+  return { x: Math.round(point.x * 10) / 10, y: Math.round(point.y * 10) / 10 };
 }
 
 /** Vero se il punto cade dentro il poligono (regola pari-dispari). */
