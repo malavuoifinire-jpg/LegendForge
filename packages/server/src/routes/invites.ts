@@ -240,7 +240,8 @@ export function inviteRoutes(context: ServerContext): Route[] {
              FROM campaign_memberships m
              JOIN users u ON u.id = m.user_id
             WHERE m.campaign_id = $1
-            ORDER BY m.role DESC, m.joined_at ASC`,
+            -- Il Game Master per primo, poi i giocatori in ordine d'arrivo.
+            ORDER BY (m.role = 'game_master') DESC, m.joined_at ASC`,
           [access.campaignId],
         );
         const members: CampaignMember[] = rows.map((row) => ({

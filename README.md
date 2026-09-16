@@ -8,9 +8,10 @@ illuminazione, pedine e combattimento a turni.
 > Accesso con PIN e codice di recupero, campagne, caricamento mappe su storage
 > privato, rilevamento della griglia, calibrazione manuale da due incroci,
 > pedine agganciate dal server e persistenza verificata dopo il ricaricamento.
-> Inviti, giocatori con PIN proprio, personaggi assegnati e sincronizzazione
-> fra browser diversi. 136 test automatici, di cui 69 di integrazione su
-> PostgreSQL reale, più il flusso a due partecipanti in browser veri.
+> Account indipendenti, codice di campagna, inviti con link, personaggi
+> assegnati e sincronizzazione fra browser diversi. 154 test automatici, di
+> cui 87 di integrazione su PostgreSQL reale, più i flussi a due e tre
+> partecipanti provati in browser veri.
 
 ## Principi
 
