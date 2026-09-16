@@ -76,11 +76,12 @@ export async function loadSceneVisionContext(
 ): Promise<SceneVisionContext> {
   const { rows } = await context.pool.query<SceneVisionRow>(
     `SELECT s.vision_enabled, s.fog_enabled, s.ambient_darkness, s.scene_reach_meters, s.version,
-            s.map_asset_id, m.width_px AS map_width_px, m.height_px AS map_height_px,
+            s.map_asset_id, a.width_px AS map_width_px, a.height_px AS map_height_px,
             g.cell_size_px, g.offset_x, g.offset_y, g.rotation_deg, g.meters_per_cell, g.snap_enabled
        FROM scenes s
        JOIN grid_configurations g ON g.scene_id = s.id
        LEFT JOIN map_assets m ON m.id = s.map_asset_id
+       LEFT JOIN assets a ON a.id = m.asset_id
       WHERE s.id = $1 AND s.deleted_at IS NULL`,
     [sceneId],
   );
