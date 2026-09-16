@@ -365,9 +365,32 @@ ALTER TABLE scene_walls  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scene_lights ENABLE ROW LEVEL SECURITY;
 `;
 
+const EXPLORATION = `
+-- Memoria dell'esplorato, per persona e per scena.
+--
+-- Una mappa di bit sulle caselle: un bit acceso significa "qui ci sono già
+-- stato". È per persona perché quello che il mio personaggio ha visto non è
+-- quello che ha visto il tuo, e la firma della griglia serve a buttarla via
+-- quando la griglia cambia: i bit si riferirebbero a caselle diverse.
+CREATE TABLE scene_exploration (
+  scene_id        uuid NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  user_id         uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  grid_signature  text NOT NULL,
+  origin_col      integer NOT NULL,
+  origin_row      integer NOT NULL,
+  width_cells     integer NOT NULL CHECK (width_cells > 0),
+  height_cells    integer NOT NULL CHECK (height_cells > 0),
+  explored        bytea NOT NULL,
+  updated_at      timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (scene_id, user_id)
+);
+ALTER TABLE scene_exploration ENABLE ROW LEVEL SECURITY;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init', sql: INIT },
   { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
   { name: '0003_join_codes', sql: JOIN_CODES },
   { name: '0004_vision', sql: VISION },
+  { name: '0005_exploration', sql: EXPLORATION },
 ];

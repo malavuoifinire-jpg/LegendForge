@@ -507,6 +507,21 @@ export const viewpointSchema = z.object({
 });
 export type Viewpoint = z.infer<typeof viewpointSchema>;
 
+/**
+ * Memoria dell'esplorato, in caselle.
+ *
+ * `cells` è una mappa di bit codificata in base64, un bit per casella in
+ * ordine di riga a partire dall'angolo (originCol, originRow).
+ */
+export const explorationSchema = z.object({
+  originCol: z.number().int(),
+  originRow: z.number().int(),
+  widthCells: z.number().int().positive(),
+  heightCells: z.number().int().positive(),
+  cells: z.string(),
+});
+export type Exploration = z.infer<typeof explorationSchema>;
+
 export const sceneVisionStateSchema = sceneVisionSettingsSchema.extend({
   /** Da quale punto di vista è calcolato: una pedina, o l'onniscienza del GM. */
   perspective: z.enum(['game_master', 'tokens']),
@@ -523,6 +538,12 @@ export const sceneVisionStateSchema = sceneVisionSettingsSchema.extend({
    * non compaiono.
    */
   visibleDoors: z.array(wallSchema),
+  /**
+   * Quello che chi guarda ha già esplorato: la terza faccia del fog of war,
+   * fra il mai visto e il visibile adesso. Assente quando non si tiene — per
+   * il Game Master, o su una griglia troppo grande per una mappa di bit.
+   */
+  exploration: explorationSchema.nullable(),
 });
 export type SceneVisionState = z.infer<typeof sceneVisionStateSchema>;
 

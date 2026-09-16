@@ -35,6 +35,7 @@ interface VisionPanelProps {
   onUpdateLight: (light: LightSource, patch: Record<string, unknown>) => void;
   onDeleteLight: (light: LightSource) => void;
   onPreview: (tokenId: string | null) => void;
+  onForgetExploration: () => void;
 }
 
 const KINDS: WallKind[] = ['opaque', 'door', 'window', 'sight_blocker', 'movement_blocker'];
@@ -77,6 +78,7 @@ export function VisionPanel({
   onUpdateLight,
   onDeleteLight,
   onPreview,
+  onForgetExploration,
 }: VisionPanelProps) {
   const previewing = previewTokenId !== null;
   const wallCount = vision.walls?.length ?? 0;
@@ -349,6 +351,30 @@ export function VisionPanel({
           </button>
         </div>
       )}
+
+      {/* ------------------------------ nebbia ------------------------------- */}
+
+      <h3 className="panel__subheader">Nebbia</h3>
+      <label className="switch">
+        <input
+          type="checkbox"
+          checked={vision.fogEnabled}
+          disabled={busy || previewing}
+          onChange={(event) => onSettings({ fogEnabled: event.target.checked })}
+        />
+        <span>Ricorda quello che è stato esplorato</span>
+      </label>
+      <p className="panel__hint">
+        Spenta, quello che si è già visto torna buio appena ci si allontana.
+      </p>
+      <button
+        type="button"
+        className="panel__action"
+        disabled={busy || previewing}
+        onClick={onForgetExploration}
+      >
+        Dimentica l'esplorato
+      </button>
 
       {/* ----------------------------- anteprima ----------------------------- */}
 

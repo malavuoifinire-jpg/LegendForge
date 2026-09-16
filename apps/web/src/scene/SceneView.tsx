@@ -502,6 +502,20 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
     [loadVision, failed],
   );
 
+  const forgetExploration = useCallback(async () => {
+    if (!scene) return;
+    if (!window.confirm('Dimenticare quello che i giocatori hanno esplorato?')) return;
+    setSaving(true);
+    try {
+      await api.forgetExploration(scene.id);
+      await loadVision();
+    } catch (caught) {
+      failed(caught, 'Memoria non cancellata');
+    } finally {
+      setSaving(false);
+    }
+  }, [scene, loadVision, failed]);
+
   const selectedWall =
     vision?.walls?.find((wall) => wall.id === selectedWallId) ??
     vision?.visibleDoors.find((wall) => wall.id === selectedWallId) ??
@@ -651,6 +665,7 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
               onClearWalls={() => void clearWalls()}
               onUpdateLight={(light, patch) => void updateLight(light, patch)}
               onDeleteLight={(light) => void deleteLight(light)}
+              onForgetExploration={() => void forgetExploration()}
               onPreview={(tokenId) => {
                 setPreviewTokenId(tokenId);
                 setTool('select');

@@ -888,3 +888,118 @@ describe('sensi del personaggio', () => {
     );
   });
 });
+
+describe('memoria dell esplorato', () => {
+  /** Quante caselle risultano esplorate nella mappa di bit ricevuta. */
+  function exploredCount(cells: string): number {
+    const bytes = Buffer.from(cells, 'base64');
+    let count = 0;
+    for (const byte of bytes) {
+      for (let bit = 0; bit < 8; bit += 1) if ((byte & (1 << bit)) !== 0) count += 1;
+    }
+    return count;
+  }
+
+  it('cresce camminando e non torna indietro', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    const eroe = await addCharacter(scene.id, player.userId, { x: 100, y: 100 }, 9);
+
+    const first = await visionFor(scene.id, player.cookie);
+    expect(first.exploration).not.toBeNull();
+    const before = exploredCount(first.exploration!.cells);
+    expect(before).toBeGreaterThan(0);
+
+    await harness.app.handle(
+      request('PATCH', `/api/tokens/${eroe.id}`, {
+        cookie: player.cookie,
+        body: { version: eroe.version, x: 1000, y: 1000, snapToGrid: false },
+      }),
+    );
+
+    const second = await visionFor(scene.id, player.cookie);
+    const after = exploredCount(second.exploration!.cells);
+    // Si è visto un posto nuovo senza dimenticare il precedente.
+    expect(after).toBeGreaterThan(before);
+  });
+
+  it('è di chi ha esplorato, non della campagna', async () => {
+    const scene = await createDarkScene();
+    const uno = await addPlayer('Uno');
+    const due = await addPlayer('Due');
+    await addCharacter(scene.id, uno.userId, { x: 100, y: 100 }, 9);
+    await addCharacter(scene.id, due.userId, { x: 2000, y: 2000 }, 9);
+
+    const visioneUno = await visionFor(scene.id, uno.cookie);
+    const visioneDue = await visionFor(scene.id, due.cookie);
+    expect(visioneUno.exploration!.cells).not.toEqual(visioneDue.exploration!.cells);
+  });
+
+  it('il Game Master non ne ha bisogno', async () => {
+    const scene = await createDarkScene();
+    expect((await visionFor(scene.id, gmCookie)).exploration).toBeNull();
+  });
+
+  it('si può dimenticare, e solo il Game Master lo fa', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 100, y: 100 }, 9);
+    const before = await visionFor(scene.id, player.cookie);
+    expect(exploredCount(before.exploration!.cells)).toBeGreaterThan(0);
+
+    expect(
+      (
+        await harness.app.handle(
+          request('DELETE', `/api/scenes/${scene.id}/exploration`, { cookie: player.cookie }),
+        )
+      ).status,
+    ).toBe(403);
+
+    const cancellato = await harness.app.handle(
+      request('DELETE', `/api/scenes/${scene.id}/exploration`, { cookie: gmCookie }),
+    );
+    expect(cancellato.status).toBe(200);
+
+    // Rileggendo si riparte da quello che si vede adesso, non da prima.
+    const dopo = await visionFor(scene.id, player.cookie);
+    expect(exploredCount(dopo.exploration!.cells)).toBeLessThanOrEqual(
+      exploredCount(before.exploration!.cells),
+    );
+  });
+
+  it('con la nebbia spenta non si tiene niente', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 100, y: 100 }, 9);
+    const detail = await sceneFor(scene.id, gmCookie);
+    await harness.app.handle(
+      request('PATCH', `/api/scenes/${scene.id}/vision`, {
+        cookie: gmCookie,
+        body: { version: detail.version, fogEnabled: false },
+      }),
+    );
+    expect((await visionFor(scene.id, player.cookie)).exploration).toBeNull();
+  });
+
+  it('cambiare la griglia azzera la memoria', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 400, y: 400 }, 18);
+    const before = await visionFor(scene.id, player.cookie);
+    const wide = exploredCount(before.exploration!.cells);
+    expect(wide).toBeGreaterThan(0);
+
+    const detail = await sceneFor(scene.id, gmCookie);
+    await harness.app.handle(
+      request('PATCH', `/api/scenes/${scene.id}/grid`, {
+        cookie: gmCookie,
+        body: { version: detail.grid.version, offsetX: 17 },
+      }),
+    );
+
+    // Gli stessi bit indicherebbero caselle diverse: si ricomincia.
+    const after = await visionFor(scene.id, player.cookie);
+    expect(after.exploration).not.toBeNull();
+    expect(after.exploration!.cells).not.toEqual(before.exploration!.cells);
+  });
+});

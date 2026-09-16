@@ -1,5 +1,13 @@
-import type { LightSource, SceneVisionState, Wall } from '@legendforge/contracts';
-import { imageToScreen, type ImagePoint, type Viewport } from '@legendforge/core';
+import type { Exploration, LightSource, SceneVisionState, Wall } from '@legendforge/contracts';
+import {
+  cellCornerToImagePoint,
+  imagePointToCell,
+  imageToScreen,
+  screenToImage,
+  type GridConfiguration,
+  type ImagePoint,
+  type Viewport,
+} from '@legendforge/core';
 
 /**
  * Strati del buio, dei muri e delle luci.
@@ -44,12 +52,83 @@ function fogSurface(width: number, height: number): HTMLCanvasElement {
  * Il ritaglio usa `destination-out` su una tela di servizio: sul canvas
  * principale cancellerebbe la mappa insieme al buio.
  */
+/** Quanto si alleggerisce il buio dove si è già stati. */
+const EXPLORED_RELIEF = 0.42;
+
+/** La mappa di bit dell'esplorato, decodificata una volta sola per stringa. */
+let decodedCells: { source: string; bits: Uint8Array } | null = null;
+
+function cellBits(exploration: Exploration): Uint8Array {
+  if (decodedCells && decodedCells.source === exploration.cells) return decodedCells.bits;
+  const binary = atob(exploration.cells);
+  const bits = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bits[i] = binary.charCodeAt(i);
+  decodedCells = { source: exploration.cells, bits };
+  return bits;
+}
+
+/**
+ * Traccia il contorno delle caselle già esplorate che si vedono adesso sullo
+ * schermo. Si guardano solo quelle: il resto della mappa di bit non è
+ * inquadrato, e scorrerlo tutto costerebbe soltanto.
+ */
+function pathExploredCells(
+  fog: CanvasRenderingContext2D,
+  exploration: Exploration,
+  grid: GridConfiguration,
+  viewport: Viewport,
+  size: { width: number; height: number },
+): void {
+  const bits = cellBits(exploration);
+  const corners = [
+    screenToImage({ x: 0, y: 0 }, viewport),
+    screenToImage({ x: size.width, y: 0 }, viewport),
+    screenToImage({ x: 0, y: size.height }, viewport),
+    screenToImage({ x: size.width, y: size.height }, viewport),
+  ].map((point) => imagePointToCell(point, grid));
+
+  const fromCol = Math.max(exploration.originCol, Math.min(...corners.map((c) => c.col)) - 1);
+  const toCol = Math.min(
+    exploration.originCol + exploration.widthCells - 1,
+    Math.max(...corners.map((c) => c.col)) + 1,
+  );
+  const fromRow = Math.max(exploration.originRow, Math.min(...corners.map((c) => c.row)) - 1);
+  const toRow = Math.min(
+    exploration.originRow + exploration.heightCells - 1,
+    Math.max(...corners.map((c) => c.row)) + 1,
+  );
+
+  fog.beginPath();
+  for (let row = fromRow; row <= toRow; row += 1) {
+    for (let col = fromCol; col <= toCol; col += 1) {
+      const index =
+        (row - exploration.originRow) * exploration.widthCells + (col - exploration.originCol);
+      const byte = bits[index >> 3] ?? 0;
+      if ((byte & (1 << (index & 7))) === 0) continue;
+      // Un filo più larghe della casella: altrimenti restano righe di buio
+      // fra una e l'altra per l'arrotondamento dei pixel.
+      const quad = [
+        cellCornerToImagePoint({ col, row }, grid),
+        cellCornerToImagePoint({ col: col + 1, row }, grid),
+        cellCornerToImagePoint({ col: col + 1, row: row + 1 }, grid),
+        cellCornerToImagePoint({ col, row: row + 1 }, grid),
+      ].map((point) => imageToScreen(point, viewport));
+      const first = quad[0];
+      if (!first) continue;
+      fog.moveTo(first.x, first.y);
+      for (const point of quad.slice(1)) fog.lineTo(point.x, point.y);
+      fog.closePath();
+    }
+  }
+}
+
 export function drawFog(
   ctx: CanvasRenderingContext2D,
   vision: SceneVisionState,
   viewport: Viewport,
   size: { width: number; height: number },
   mapRect: Rect,
+  grid: GridConfiguration,
 ): void {
   const ratio = Math.min(window.devicePixelRatio || 1, 2);
   const surface = fogSurface(Math.round(size.width * ratio), Math.round(size.height * ratio));
@@ -63,6 +142,16 @@ export function drawFog(
   // Il buio copre soltanto la mappa: fuori non c'è niente da nascondere.
   fog.fillStyle = 'rgba(3, 5, 10, 0.94)';
   fog.fillRect(mapRect.x, mapRect.y, mapRect.width, mapRect.height);
+
+  // Dove si è già stati il buio si alleggerisce, senza aprirsi: si ricorda la
+  // stanza, non si vede chi ci è entrato adesso.
+  if (vision.exploration) {
+    fog.globalCompositeOperation = 'destination-out';
+    fog.globalAlpha = EXPLORED_RELIEF;
+    pathExploredCells(fog, vision.exploration, grid, viewport, size);
+    fog.fill();
+    fog.globalAlpha = 1;
+  }
 
   fog.globalCompositeOperation = 'destination-out';
   for (const viewpoint of vision.viewpoints) {

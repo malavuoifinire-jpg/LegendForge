@@ -20,6 +20,7 @@ import { requireViewer, type ServerContext } from '../context.js';
 import { emitSceneEvent, pruneSceneEvents } from '../events.js';
 import { HttpError, type Route } from '../http.js';
 import { parseBody } from '../validate.js';
+import { forgetExploration, rememberAndLoad } from '../exploration.js';
 import { controlLevel, toToken, type TokenRow } from './tokens.js';
 import {
   computeViewpoints,
@@ -49,6 +50,9 @@ interface SceneVisionRow {
   ambient_darkness: number;
   scene_reach_meters: number;
   version: number;
+  map_asset_id: string | null;
+  map_width_px: number | null;
+  map_height_px: number | null;
   cell_size_px: number;
   offset_x: number;
   offset_y: number;
@@ -61,6 +65,9 @@ export interface SceneVisionContext {
   settings: SceneVisionSettings;
   sceneVersion: number;
   grid: GridConfiguration;
+  mapAssetId: string | null;
+  /** Dimensioni native della mappa, quando ce n'è una. */
+  map: { widthPx: number; heightPx: number } | null;
 }
 
 export async function loadSceneVisionContext(
@@ -69,9 +76,11 @@ export async function loadSceneVisionContext(
 ): Promise<SceneVisionContext> {
   const { rows } = await context.pool.query<SceneVisionRow>(
     `SELECT s.vision_enabled, s.fog_enabled, s.ambient_darkness, s.scene_reach_meters, s.version,
+            s.map_asset_id, m.width_px AS map_width_px, m.height_px AS map_height_px,
             g.cell_size_px, g.offset_x, g.offset_y, g.rotation_deg, g.meters_per_cell, g.snap_enabled
        FROM scenes s
        JOIN grid_configurations g ON g.scene_id = s.id
+       LEFT JOIN map_assets m ON m.id = s.map_asset_id
       WHERE s.id = $1 AND s.deleted_at IS NULL`,
     [sceneId],
   );
@@ -93,6 +102,11 @@ export async function loadSceneVisionContext(
       metersPerCell: Number(row.meters_per_cell),
       snapEnabled: row.snap_enabled,
     },
+    mapAssetId: row.map_asset_id,
+    map:
+      row.map_width_px !== null && row.map_height_px !== null
+        ? { widthPx: Number(row.map_width_px), heightPx: Number(row.map_height_px) }
+        : null,
   };
 }
 
@@ -273,6 +287,23 @@ export function visionRoutes(context: ServerContext): Route[] {
           asToken ? { throughTokenIds: [asToken] } : {},
         );
 
+        // La memoria dell'esplorato è di chi gioca. Il Game Master vede tutto
+        // comunque, e l'anteprima non deve sporcare il ricordo di nessuno.
+        const remembered =
+          access.role === 'game_master' ||
+          !vision.settings.visionEnabled ||
+          !vision.settings.fogEnabled
+            ? null
+            : await rememberAndLoad(
+                context,
+                access.sceneId,
+                viewer.id,
+                viewpoints,
+                vision.grid,
+                vision.map,
+                vision.mapAssetId,
+              );
+
         const body: SceneVisionState = {
           ...vision.settings,
           perspective: isGameMaster ? 'game_master' : 'tokens',
@@ -280,6 +311,15 @@ export function visionRoutes(context: ServerContext): Route[] {
           walls: isGameMaster ? await loadWalls(context, access.sceneId) : null,
           lights: isGameMaster ? await loadLights(context, access.sceneId) : null,
           visibleDoors,
+          exploration: remembered
+            ? {
+                originCol: remembered.originCol,
+                originRow: remembered.originRow,
+                widthCells: remembered.widthCells,
+                heightCells: remembered.heightCells,
+                cells: Buffer.from(remembered.bits).toString('base64'),
+              }
+            : null,
         };
         return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
       },
@@ -325,6 +365,26 @@ export function visionRoutes(context: ServerContext): Route[] {
         await announceVision(context, access.sceneId, 'vision.changed');
         const updated = await loadSceneVisionContext(context, access.sceneId);
         return { status: 200, headers: { 'Cache-Control': 'no-store' }, body: updated.settings };
+      },
+    },
+
+    {
+      /**
+       * Dimentica l'esplorato.
+       *
+       * Serve quando la mappa cambia sotto le stesse coordinate, o quando si
+       * ricomincia una sessione da capo. È del Game Master perché riguarda
+       * tutti, non solo chi chiede.
+       */
+      method: 'DELETE',
+      pattern: '/api/scenes/:sceneId/exploration',
+      async handle({ request, params }) {
+        const viewer = await requireViewer(context, request);
+        const access = await requireSceneAccess(context, viewer, params.sceneId ?? '');
+        requireGameMaster(access);
+        await forgetExploration(context, access.sceneId);
+        await announceVision(context, access.sceneId, 'vision.changed');
+        return { status: 200, body: { ok: true } };
       },
     },
 

@@ -171,6 +171,8 @@ export const api = {
     ),
   updateSceneVision: (sceneId: string, input: UpdateSceneVisionInput) =>
     patch<SceneVisionSettings>(`/api/scenes/${sceneId}/vision`, input),
+  forgetExploration: (sceneId: string) =>
+    request<{ ok: boolean }>(`/api/scenes/${sceneId}/exploration`, { method: 'DELETE' }),
   createWalls: (sceneId: string, walls: CreateWallInput[]) =>
     post<Wall[]>(`/api/scenes/${sceneId}/walls`, { walls }),
   updateWall: (wallId: string, input: UpdateWallInput) =>

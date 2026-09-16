@@ -226,12 +226,19 @@ export function SceneCanvas({
     // Buio e campo visivo: solo quando si guarda con gli occhi di una pedina.
     // Il Game Master, che vede tutto, non deve guardare attraverso un velo.
     if (vision && vision.visionEnabled && vision.perspective === 'tokens') {
-      drawFog(ctx, vision, viewport, size, {
-        x: origin.x,
-        y: origin.y,
-        width: map.width * viewport.zoom,
-        height: map.height * viewport.zoom,
-      });
+      drawFog(
+        ctx,
+        vision,
+        viewport,
+        size,
+        {
+          x: origin.x,
+          y: origin.y,
+          width: map.width * viewport.zoom,
+          height: map.height * viewport.zoom,
+        },
+        grid,
+      );
       drawSightEdges(ctx, vision, viewport);
     }
 
