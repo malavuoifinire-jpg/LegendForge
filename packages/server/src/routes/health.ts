@@ -1,4 +1,5 @@
 import { API_SCHEMA_VERSION, type Health } from '@legendforge/contracts';
+import type { BucketState } from '../storage/supabase.js';
 import type { DatabasePool } from '../db.js';
 import type { ServerEnv } from '../env.js';
 import type { Route } from '../http.js';
@@ -67,10 +68,15 @@ async function probeDatabase(pool: DatabasePool | null): Promise<DatabaseProbe> 
   }
 }
 
+export interface HealthSources {
+  migrations: () => MigrationOutcome | null;
+  storage: () => BucketState | null;
+}
+
 export function healthRoutes(
   env: ServerEnv,
   pool: DatabasePool | null,
-  migrations: () => MigrationOutcome | null,
+  sources: HealthSources,
 ): Route[] {
   return [
     {
@@ -78,7 +84,9 @@ export function healthRoutes(
       pattern: '/api/health',
       async handle() {
         const database = await probeDatabase(pool);
-        const outcome = migrations();
+        const outcome = sources.migrations();
+        const bucket = sources.storage();
+        const storageConfigured = Boolean(env.supabaseUrl && env.supabaseServiceRoleKey);
         const body: Health = {
           status: database.reachable && (outcome?.ok ?? false) ? 'ok' : 'degraded',
           apiSchemaVersion: API_SCHEMA_VERSION,
@@ -86,6 +94,16 @@ export function healthRoutes(
           build: env.build,
           region: env.region,
           database,
+          storage: {
+            configured: storageConfigured,
+            bucket: env.storageBucket,
+            ready: bucket?.exists ?? false,
+            createdNow: bucket?.created ?? false,
+            publicBucket: bucket?.public ?? null,
+            error: storageConfigured
+              ? (bucket?.error ?? (bucket ? null : 'verifica non ancora eseguita'))
+              : 'SUPABASE_URL o SUPABASE_SERVICE_ROLE_KEY non configurate',
+          },
           migrations: {
             expected: MIGRATIONS.length,
             appliedNow: outcome?.applied ?? [],

@@ -10,6 +10,8 @@ export const TEST_ENV: ServerEnv = {
   databaseUrl: process.env.DATABASE_URL ?? '',
   databaseSsl: (process.env.DATABASE_SSL as ServerEnv['databaseSsl']) ?? 'disable',
   autoMigrate: false,
+  storageBucket: 'legendforge-test',
+  maxUploadBytes: 32 * 1024 * 1024,
   build: 'test',
   region: null,
   nodeEnv: 'test',

@@ -157,6 +157,11 @@ export const campaignSchema = entityMetaSchema.extend({
 });
 export type Campaign = z.infer<typeof campaignSchema>;
 
+/* ------------------------------ mappe e file ------------------------------ */
+
+export const SUPPORTED_MAP_MIME_TYPES = ['image/png', 'image/jpeg'] as const;
+export type SupportedMapMimeType = (typeof SUPPORTED_MAP_MIME_TYPES)[number];
+
 /* --------------------------------- stato --------------------------------- */
 
 /** Esito del controllo di stato del servizio. */
@@ -175,6 +180,17 @@ export const healthSchema = z.object({
     serverVersion: z.string().nullable(),
     /** Numero di migrazioni applicate, null se la tabella non esiste ancora. */
     migrationsApplied: z.number().int().nullable(),
+    error: z.string().nullable(),
+  }),
+  storage: z.object({
+    configured: z.boolean(),
+    bucket: z.string(),
+    /** Il bucket esiste ed è utilizzabile. */
+    ready: z.boolean(),
+    /** Creato adesso da questa istanza. */
+    createdNow: z.boolean(),
+    /** true è un problema: le mappe sarebbero leggibili da chiunque. */
+    publicBucket: z.boolean().nullable(),
     error: z.string().nullable(),
   }),
   migrations: z.object({

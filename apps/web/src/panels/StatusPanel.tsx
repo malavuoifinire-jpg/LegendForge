@@ -79,6 +79,21 @@ function HealthView({ health }: { health: Health }) {
         }
         tone={migrations.ok ? 'good' : 'bad'}
       />
+      <Row
+        label="Storage"
+        value={
+          !health.storage.configured
+            ? 'non configurato'
+            : health.storage.ready
+              ? `bucket ${health.storage.bucket}${health.storage.createdNow ? ' · creato ora' : ''}`
+              : 'non pronto'
+        }
+        tone={health.storage.ready ? 'good' : health.storage.configured ? 'bad' : 'warn'}
+      />
+      {health.storage.publicBucket === true && (
+        <Row label="Attenzione" value="il bucket è pubblico: le mappe sono leggibili da chiunque" tone="bad" />
+      )}
+      {health.storage.error && <Row label="Errore storage" value={health.storage.error} tone="bad" />}
       {migrations.appliedNow.length > 0 && (
         <Row label="Appena applicate" value={migrations.appliedNow.join(', ')} tone="good" />
       )}
