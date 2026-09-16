@@ -165,6 +165,10 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
   const reloadVisionRef = useRef(loadVision);
   reloadVisionRef.current = loadVision;
 
+  // Lo stato più recente della visione, leggibile dentro un gesto in corso.
+  const visionRef = useRef<SceneVisionState | null>(vision);
+  visionRef.current = vision;
+
   useSceneSync(scene ? scene.id : null, scene?.eventCursor ?? 0, applyEvents);
 
   const canEdit = scene?.viewerRole === 'game_master';
@@ -361,6 +365,45 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
       }
     },
     [scene, load, loadVision, failed],
+  );
+
+  /**
+   * Trascinamento di un estremo del muro.
+   *
+   * Durante il gesto si muove solo la copia locale: salvare a ogni pixel
+   * riempirebbe il registro degli eventi di rumore. Alla fine si salva una
+   * volta e si rilegge quello che il server ha accettato.
+   */
+  const moveWallVertex = useCallback(
+    async (wallId: string, end: 'a' | 'b', point: ImagePoint, done: boolean) => {
+      setVision((current) => {
+        if (!current?.walls) return current;
+        return {
+          ...current,
+          walls: current.walls.map((wall) =>
+            wall.id === wallId
+              ? end === 'a'
+                ? { ...wall, ax: point.x, ay: point.y }
+                : { ...wall, bx: point.x, by: point.y }
+              : wall,
+          ),
+        };
+      });
+      if (!done) return;
+
+      const wall = visionRef.current?.walls?.find((candidate) => candidate.id === wallId);
+      if (!wall) return;
+      try {
+        await api.updateWall(wallId, {
+          version: wall.version,
+          ...(end === 'a' ? { ax: point.x, ay: point.y } : { bx: point.x, by: point.y }),
+        });
+      } catch (caught) {
+        failed(caught, 'Vertice non spostato');
+      }
+      await loadVision();
+    },
+    [loadVision, failed],
   );
 
   const addWallPoint = useCallback((point: ImagePoint) => {
@@ -605,6 +648,9 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
               onWallPoint={addWallPoint}
               onSelectWall={setSelectedWallId}
               onSelectLight={setSelectedLightId}
+              onMoveWallVertex={(wallId, end, point, done) =>
+                void moveWallVertex(wallId, end, point, done)
+              }
               onPlaceLight={(point) => void placeLight(point)}
             />
           )}

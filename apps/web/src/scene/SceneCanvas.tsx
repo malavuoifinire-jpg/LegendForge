@@ -76,6 +76,11 @@ interface SceneCanvasProps {
   snapWalls?: boolean;
   onWallPoint?: (point: ImagePoint) => void;
   onSelectWall?: (id: string | null) => void;
+  /**
+   * Trascinamento di un estremo del muro selezionato. `done` è vero quando il
+   * gesto è finito: è il momento di salvare, non prima.
+   */
+  onMoveWallVertex?: (wallId: string, end: 'a' | 'b', point: ImagePoint, done: boolean) => void;
   onSelectLight?: (id: string | null) => void;
   onPlaceLight?: (point: ImagePoint) => void;
 }
@@ -98,7 +103,8 @@ function snapToCorner(point: ImagePoint, grid: GridConfiguration): ImagePoint {
 type Interaction =
   | { kind: 'none' }
   | { kind: 'pan'; lastX: number; lastY: number }
-  | { kind: 'token'; id: string; grabOffsetX: number; grabOffsetY: number };
+  | { kind: 'token'; id: string; grabOffsetX: number; grabOffsetY: number }
+  | { kind: 'wallVertex'; id: string; end: 'a' | 'b' };
 
 const GRID_LINE_COLOR = 'rgba(126, 231, 255, 0.34)';
 const GRID_AXIS_COLOR = 'rgba(126, 231, 255, 0.7)';
@@ -129,6 +135,7 @@ export function SceneCanvas({
   onSelectWall,
   onSelectLight,
   onPlaceLight,
+  onMoveWallVertex,
 }: SceneCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -347,6 +354,23 @@ export function SceneCanvas({
         return;
       }
 
+      // Un estremo del muro selezionato si prende e si trascina: è il modo
+      // di correggere un vertice senza rifare la spezzata.
+      if (event.button === 0 && tool === 'select' && selectedWallId && onMoveWallVertex) {
+        const wall = vision?.walls?.find((candidate) => candidate.id === selectedWallId);
+        if (wall) {
+          const tolerance = 9 / viewport.zoom;
+          if (Math.hypot(image.x - wall.ax, image.y - wall.ay) <= tolerance) {
+            interactionRef.current = { kind: 'wallVertex', id: wall.id, end: 'a' };
+            return;
+          }
+          if (Math.hypot(image.x - wall.bx, image.y - wall.by) <= tolerance) {
+            interactionRef.current = { kind: 'wallVertex', id: wall.id, end: 'b' };
+            return;
+          }
+        }
+      }
+
       if (event.button === 0 && tool === 'wall') {
         onWallPoint?.(snapWalls ? snapToCorner(image, grid) : image);
         return;
@@ -412,6 +436,8 @@ export function SceneCanvas({
       onPlaceLight,
       onSelectWall,
       onSelectLight,
+      selectedWallId,
+      onMoveWallVertex,
     ],
   );
 
@@ -439,9 +465,19 @@ export function SceneCanvas({
           x: image.x - interaction.grabOffsetX,
           y: image.y - interaction.grabOffsetY,
         });
+        return;
+      }
+
+      if (interaction.kind === 'wallVertex') {
+        onMoveWallVertex?.(
+          interaction.id,
+          interaction.end,
+          snapWalls ? snapToCorner(image, grid) : image,
+          false,
+        );
       }
     },
-    [viewport, grid, onHoverCell, onMoveToken, tool, snapWalls],
+    [viewport, grid, onHoverCell, onMoveToken, tool, snapWalls, onMoveWallVertex],
   );
 
   const handlePointerUp = useCallback(
@@ -450,6 +486,22 @@ export function SceneCanvas({
       canvas?.releasePointerCapture(event.pointerId);
       const interaction = interactionRef.current;
       interactionRef.current = { kind: 'none' };
+
+      if (interaction.kind === 'wallVertex') {
+        const rect = canvas?.getBoundingClientRect();
+        if (!rect) return;
+        const image = screenToImage(
+          { x: event.clientX - rect.left, y: event.clientY - rect.top },
+          viewport,
+        );
+        onMoveWallVertex?.(
+          interaction.id,
+          interaction.end,
+          snapWalls ? snapToCorner(image, grid) : image,
+          true,
+        );
+        return;
+      }
 
       if (interaction.kind !== 'token') return;
       const token = tokens.find((candidate) => candidate.id === interaction.id);
@@ -464,7 +516,7 @@ export function SceneCanvas({
       // Il salvataggio avviene a fine gesto, non a ogni pixel percorso.
       onCommitToken?.(token.id);
     },
-    [grid, tokens, onMoveToken, onCommitToken],
+    [grid, tokens, onMoveToken, onCommitToken, viewport, snapWalls, onMoveWallVertex],
   );
 
   // Lo zoom con la rotella richiede un listener non passivo: React registra

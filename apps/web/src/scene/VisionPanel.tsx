@@ -224,7 +224,8 @@ export function VisionPanel({
       {selectedWall && tool === 'select' && (
         <div className="panel__box">
           <p className="panel__hint">
-            {WALL_STYLES[selectedWall.kind].label} selezionato.
+            {WALL_STYLES[selectedWall.kind].label} selezionato. Trascina uno dei due pallini per
+            spostarne il vertice.
           </p>
           <label className="field">
             <span className="field__label">Tipo</span>
