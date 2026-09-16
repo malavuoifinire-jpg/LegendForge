@@ -29,6 +29,16 @@ import type {
   UpdateTokenInput,
   UploadTicket,
   Viewer,
+  CreateLightInput,
+  CreateWallInput,
+  DoorState,
+  LightSource,
+  SceneVisionSettings,
+  SceneVisionState,
+  UpdateLightInput,
+  UpdateSceneVisionInput,
+  UpdateWallInput,
+  Wall,
 } from '@legendforge/contracts';
 
 export class ApiError extends Error {
@@ -145,6 +155,35 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ userIds }),
     }),
+
+  /**
+   * Che cosa vede chi chiede.
+   *
+   * Al giocatore tornano solo i poligoni; i muri e le luci arrivano soltanto
+   * al Game Master, e nemmeno a lui quando guarda in anteprima da una pedina.
+   */
+  sceneVision: (sceneId: string, asToken?: string) =>
+    request<SceneVisionState>(
+      `/api/scenes/${sceneId}/vision${asToken ? `?asToken=${encodeURIComponent(asToken)}` : ''}`,
+    ),
+  updateSceneVision: (sceneId: string, input: UpdateSceneVisionInput) =>
+    patch<SceneVisionSettings>(`/api/scenes/${sceneId}/vision`, input),
+  createWalls: (sceneId: string, walls: CreateWallInput[]) =>
+    post<Wall[]>(`/api/scenes/${sceneId}/walls`, { walls }),
+  updateWall: (wallId: string, input: UpdateWallInput) =>
+    patch<Wall>(`/api/walls/${wallId}`, input),
+  deleteWall: (wallId: string) =>
+    request<{ ok: boolean }>(`/api/walls/${wallId}`, { method: 'DELETE' }),
+  clearWalls: (sceneId: string) =>
+    request<{ ok: boolean }>(`/api/scenes/${sceneId}/walls`, { method: 'DELETE' }),
+  setDoorState: (wallId: string, state: DoorState) =>
+    post<Wall>(`/api/walls/${wallId}/door`, { state }),
+  createLight: (sceneId: string, input: Partial<CreateLightInput> & { name: string; x: number; y: number }) =>
+    post<LightSource>(`/api/scenes/${sceneId}/lights`, input),
+  updateLight: (lightId: string, input: UpdateLightInput) =>
+    patch<LightSource>(`/api/lights/${lightId}`, input),
+  deleteLight: (lightId: string) =>
+    request<{ ok: boolean }>(`/api/lights/${lightId}`, { method: 'DELETE' }),
 
   sceneEvents: (sceneId: string, since: number, signal: AbortSignal) =>
     request<SceneEvents>(`/api/scenes/${sceneId}/events?since=${since}`, { signal }),

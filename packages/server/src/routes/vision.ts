@@ -26,6 +26,7 @@ import {
   loadLights,
   loadVisionProfiles,
   loadWalls,
+  doorsInSight,
   toLight,
   tokenIsVisible,
   toWall,
@@ -134,7 +135,12 @@ export async function viewerViewpoints(
   userId: string,
   role: CampaignRole,
   options: { throughTokenIds?: string[] } = {},
-): Promise<{ viewpoints: Viewpoint[]; tokens: Token[]; vision: SceneVisionContext }> {
+): Promise<{
+  viewpoints: Viewpoint[];
+  tokens: Token[];
+  vision: SceneVisionContext;
+  visibleDoors: Wall[];
+}> {
   const vision = await loadSceneVisionContext(context, sceneId);
   const tokens = await loadAllTokens(context, sceneId);
 
@@ -147,7 +153,7 @@ export async function viewerViewpoints(
   } else {
     eyes = await controlledTokens(context, userId, role, tokens);
   }
-  if (eyes.length === 0) return { viewpoints: [], tokens, vision };
+  if (eyes.length === 0) return { viewpoints: [], tokens, vision, visibleDoors: [] };
 
   const [walls, lights, profiles] = await Promise.all([
     loadWalls(context, sceneId),
@@ -159,7 +165,7 @@ export async function viewerViewpoints(
     { settings: vision.settings, grid: vision.grid, walls, lights, tokens, profiles },
     eyes,
   );
-  return { viewpoints, tokens, vision };
+  return { viewpoints, tokens, vision, visibleDoors: doorsInSight(viewpoints, walls) };
 }
 
 /**
@@ -259,7 +265,7 @@ export function visionRoutes(context: ServerContext): Route[] {
         }
 
         const isGameMaster = access.role === 'game_master' && !asToken;
-        const { viewpoints, vision } = await viewerViewpoints(
+        const { viewpoints, vision, visibleDoors } = await viewerViewpoints(
           context,
           access.sceneId,
           viewer.id,
@@ -273,6 +279,7 @@ export function visionRoutes(context: ServerContext): Route[] {
           viewpoints,
           walls: isGameMaster ? await loadWalls(context, access.sceneId) : null,
           lights: isGameMaster ? await loadLights(context, access.sceneId) : null,
+          visibleDoors,
         };
         return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
       },

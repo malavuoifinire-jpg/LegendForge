@@ -14,7 +14,21 @@ import {
   type ImagePoint,
   type Viewport,
 } from '@legendforge/core';
+import type { LightSource, SceneVisionState } from '@legendforge/contracts';
 import type { CanvasMap, CanvasToken } from './types';
+import {
+  drawDraftWall,
+  drawFog,
+  drawLights,
+  drawSightEdges,
+  drawWalls,
+} from './visionLayers';
+import {
+  cellVectorToImagePoint,
+  distanceToSegment,
+  imagePointToCellVector,
+  pixelsPerMeter,
+} from '@legendforge/core';
 
 interface SceneCanvasProps {
   map: CanvasMap | null;
@@ -44,6 +58,41 @@ interface SceneCanvasProps {
   onPickPoint?: (point: ImagePoint) => void;
   /** Punti già raccolti, disegnati come riferimento. */
   pickedPoints?: ImagePoint[];
+
+  /* -------------------------------- visione ------------------------------- */
+
+  /** Che cosa si vede, come l'ha calcolato il server. */
+  vision?: SceneVisionState | null;
+  /**
+   * Strumento attivo. `wall` e `light` sono del Game Master: il clic smette di
+   * selezionare pedine e diventa un gesto di disegno.
+   */
+  tool?: 'select' | 'wall' | 'light';
+  /** Vertici della spezzata in corso di disegno. */
+  draftWall?: ImagePoint[];
+  selectedWallId?: string | null;
+  selectedLightId?: string | null;
+  /** Aggancia i vertici dei muri agli angoli della griglia. */
+  snapWalls?: boolean;
+  onWallPoint?: (point: ImagePoint) => void;
+  onSelectWall?: (id: string | null) => void;
+  onSelectLight?: (id: string | null) => void;
+  onPlaceLight?: (point: ImagePoint) => void;
+}
+
+/**
+ * Aggancia un punto all'angolo di griglia più vicino.
+ *
+ * I muri corrono lungo i bordi delle stanze, che sui più delle mappe cadono
+ * sugli angoli delle caselle: agganciare evita spifferi di un pixel fra due
+ * segmenti che dovrebbero toccarsi.
+ */
+function snapToCorner(point: ImagePoint, grid: GridConfiguration): ImagePoint {
+  const vector = imagePointToCellVector(point, grid);
+  return cellVectorToImagePoint(
+    { col: Math.round(vector.col), row: Math.round(vector.row) },
+    grid,
+  );
 }
 
 type Interaction =
@@ -70,12 +119,23 @@ export function SceneCanvas({
   picking = false,
   onPickPoint,
   pickedPoints,
+  vision = null,
+  tool = 'select',
+  draftWall,
+  selectedWallId = null,
+  selectedLightId = null,
+  snapWalls = true,
+  onWallPoint,
+  onSelectWall,
+  onSelectLight,
+  onPlaceLight,
 }: SceneCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const interactionRef = useRef<Interaction>({ kind: 'none' });
   const [size, setSize] = useState({ width: 0, height: 0 });
   const [viewport, setViewport] = useState<Viewport>({ panX: 0, panY: 0, zoom: 1 });
+  const [cursor, setCursor] = useState<ImagePoint | null>(null);
   const initialisedRef = useRef(false);
 
   /* ----------------------------- dimensionamento ---------------------------- */
@@ -157,6 +217,34 @@ export function SceneCanvas({
     // Griglia sovrapposta: mai impressa sull'immagine
     if (gridVisible) drawGrid(ctx, map, grid, viewport, size);
 
+    // Luci sotto al buio: quello che illuminano si vede attraverso i ritagli.
+    if (vision?.lights && vision.lights.length > 0) {
+      const positions = new Map(tokens.map((token) => [token.id, { x: token.x, y: token.y }]));
+      drawLights(ctx, vision.lights, positions, pixelsPerMeter(grid), viewport, selectedLightId);
+    }
+
+    // Buio e campo visivo: solo quando si guarda con gli occhi di una pedina.
+    // Il Game Master, che vede tutto, non deve guardare attraverso un velo.
+    if (vision && vision.visionEnabled && vision.perspective === 'tokens') {
+      drawFog(ctx, vision, viewport, size, {
+        x: origin.x,
+        y: origin.y,
+        width: map.width * viewport.zoom,
+        height: map.height * viewport.zoom,
+      });
+      drawSightEdges(ctx, vision, viewport);
+    }
+
+    // Muri: li riceve solo il Game Master, e li disegna sopra al resto perché
+    // è la cosa che sta modificando.
+    if (vision?.walls) drawWalls(ctx, vision.walls, viewport, selectedWallId);
+    // Al giocatore non arrivano i muri, ma le porte che ha davanti sì: senza
+    // vederle non potrebbe aprirle.
+    else if (vision) drawWalls(ctx, vision.visibleDoors, viewport, selectedWallId);
+    if (draftWall && draftWall.length > 0) {
+      drawDraftWall(ctx, draftWall, tool === 'wall' ? cursor : null, viewport);
+    }
+
     // Pedine
     for (const token of tokens) {
       drawToken(ctx, token, grid, viewport, token.id === selectedTokenId);
@@ -166,7 +254,22 @@ export function SceneCanvas({
     for (const [index, point] of (pickedPoints ?? []).entries()) {
       drawPickedPoint(ctx, point, viewport, index + 1);
     }
-  }, [map, grid, gridVisible, tokens, selectedTokenId, viewport, size, pickedPoints]);
+  }, [
+    map,
+    grid,
+    gridVisible,
+    tokens,
+    selectedTokenId,
+    viewport,
+    size,
+    pickedPoints,
+    vision,
+    draftWall,
+    selectedWallId,
+    selectedLightId,
+    tool,
+    cursor,
+  ]);
 
   /* ------------------------------ interazione ------------------------------ */
 
@@ -183,6 +286,46 @@ export function SceneCanvas({
     [tokens, grid.cellSizePx],
   );
 
+  /** Muro più vicino al punto, entro una soglia che non dipende dallo zoom. */
+  const wallAtPoint = useCallback(
+    (point: ImagePoint): string | null => {
+      const walls = vision?.walls ?? vision?.visibleDoors;
+      if (!walls || walls.length === 0) return null;
+      const tolerance = 8 / viewport.zoom;
+      let best: { id: string; distance: number } | null = null;
+      for (const wall of walls) {
+        const distance = distanceToSegment(
+          point,
+          { x: wall.ax, y: wall.ay },
+          { x: wall.bx, y: wall.by },
+        );
+        if (distance <= tolerance && (!best || distance < best.distance)) {
+          best = { id: wall.id, distance };
+        }
+      }
+      return best ? best.id : null;
+    },
+    [vision, viewport.zoom],
+  );
+
+  const lightAtPoint = useCallback(
+    (point: ImagePoint): LightSource | null => {
+      const lights = vision?.lights;
+      if (!lights) return null;
+      const tolerance = 10 / viewport.zoom;
+      for (const light of lights) {
+        const anchor = light.tokenId
+          ? tokens.find((token) => token.id === light.tokenId)
+          : undefined;
+        const x = anchor ? anchor.x : light.x;
+        const y = anchor ? anchor.y : light.y;
+        if (Math.hypot(point.x - x, point.y - y) <= tolerance) return light;
+      }
+      return null;
+    },
+    [vision, viewport.zoom, tokens],
+  );
+
   const handlePointerDown = useCallback(
     (event: ReactPointerEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
@@ -197,7 +340,36 @@ export function SceneCanvas({
         return;
       }
 
+      if (event.button === 0 && tool === 'wall') {
+        onWallPoint?.(snapWalls ? snapToCorner(image, grid) : image);
+        return;
+      }
+
+      if (event.button === 0 && tool === 'light') {
+        onPlaceLight?.(image);
+        return;
+      }
+
       const token = tokenAtPoint(image);
+
+      // Con lo strumento di selezione, muri e luci si prendono solo se non c'è
+      // una pedina sotto al dito: le pedine restano la cosa che si tocca di più.
+      if (event.button === 0 && !token && vision) {
+        const light = lightAtPoint(image);
+        if (light) {
+          onSelectLight?.(light.id);
+          onSelectWall?.(null);
+          return;
+        }
+        const wall = wallAtPoint(image);
+        if (wall) {
+          onSelectWall?.(wall);
+          onSelectLight?.(null);
+          return;
+        }
+        onSelectWall?.(null);
+        onSelectLight?.(null);
+      }
 
       if (token && event.button === 0) {
         onSelectToken(token.id);
@@ -216,7 +388,24 @@ export function SceneCanvas({
       if (event.button === 0) onSelectToken(null);
       interactionRef.current = { kind: 'pan', lastX: event.clientX, lastY: event.clientY };
     },
-    [viewport, tokenAtPoint, onSelectToken, picking, onPickPoint, canMoveToken],
+    [
+      viewport,
+      tokenAtPoint,
+      onSelectToken,
+      picking,
+      onPickPoint,
+      canMoveToken,
+      tool,
+      snapWalls,
+      grid,
+      vision,
+      wallAtPoint,
+      lightAtPoint,
+      onWallPoint,
+      onPlaceLight,
+      onSelectWall,
+      onSelectLight,
+    ],
   );
 
   const handlePointerMove = useCallback(
@@ -227,6 +416,7 @@ export function SceneCanvas({
       const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
       const image = screenToImage(screen, viewport);
       onHoverCell?.(imagePointToCell(image, grid));
+      if (tool === 'wall') setCursor(snapWalls ? snapToCorner(image, grid) : image);
 
       const interaction = interactionRef.current;
       if (interaction.kind === 'pan') {
@@ -244,7 +434,7 @@ export function SceneCanvas({
         });
       }
     },
-    [viewport, grid, onHoverCell, onMoveToken],
+    [viewport, grid, onHoverCell, onMoveToken, tool, snapWalls],
   );
 
   const handlePointerUp = useCallback(

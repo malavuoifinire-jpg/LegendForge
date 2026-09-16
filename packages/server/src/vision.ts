@@ -7,6 +7,7 @@ import type {
 } from '@legendforge/contracts';
 import {
   computeVisibilityPolygon,
+  hasLineOfSight,
   DEFAULT_VISION_PROFILE,
   metersToPixels,
   pixelsPerMeter,
@@ -278,4 +279,35 @@ export function tokenIsVisible(
     }
   }
   return false;
+}
+
+/**
+ * Le porte che chi guarda ha davanti agli occhi.
+ *
+ * Il controllo non è "il punto cade nel poligono": gli estremi di una porta
+ * stanno esattamente sul bordo del poligono, dove l'appartenenza è ambigua. Si
+ * chiede invece se da lì la si vede, che è la stessa domanda posta bene.
+ */
+export function doorsInSight(
+  viewpoints: readonly Viewpoint[],
+  walls: readonly Wall[],
+): Wall[] {
+  const doors = walls.filter((wall) => wall.kind === 'door');
+  if (doors.length === 0 || viewpoints.length === 0) return [];
+  const segments = walls.map(toWallSegment);
+
+  return doors.filter((door) => {
+    const probes = [
+      { x: door.ax, y: door.ay },
+      { x: door.bx, y: door.by },
+      { x: (door.ax + door.bx) / 2, y: (door.ay + door.by) / 2 },
+    ];
+    return viewpoints.some((viewpoint) =>
+      probes.some(
+        (probe) =>
+          Math.hypot(probe.x - viewpoint.origin.x, probe.y - viewpoint.origin.y) <=
+            viewpoint.radiusPx && hasLineOfSight(viewpoint.origin, probe, segments),
+      ),
+    );
+  });
 }

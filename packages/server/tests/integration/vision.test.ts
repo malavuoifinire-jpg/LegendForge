@@ -773,3 +773,46 @@ describe('sincronizzazione', () => {
     expect(JSON.stringify(body)).not.toContain('"ax"');
   });
 });
+
+describe('porte in vista', () => {
+  it('il giocatore riceve le porte che vede e non le altre', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 250, y: 300 });
+    const [vicina, lontana] = await addWalls(scene.id, [
+      { ax: 300, ay: 250, bx: 300, by: 350, kind: 'door', doorState: 'closed' },
+      { ax: 2000, ay: 250, bx: 2000, by: 350, kind: 'door', doorState: 'closed' },
+    ]);
+
+    const vision = await visionFor(scene.id, player.cookie);
+    const ids = vision.visibleDoors.map((door) => door.id);
+    expect(ids).toContain(vicina?.id);
+    expect(ids).not.toContain(lontana?.id);
+    // I muri restano comunque fuori dalla risposta.
+    expect(vision.walls).toBeNull();
+  });
+
+  it('una porta dietro a un muro non si vede', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    await addCharacter(scene.id, player.userId, { x: 100, y: 300 });
+    const [, dietro] = await addWalls(scene.id, [
+      { ax: 300, ay: 0, bx: 300, by: 600 },
+      { ax: 500, ay: 250, bx: 500, by: 350, kind: 'door', doorState: 'closed' },
+    ]);
+
+    const vision = await visionFor(scene.id, player.cookie);
+    expect(vision.visibleDoors.map((door) => door.id)).not.toContain(dietro?.id);
+  });
+
+  it('per il Game Master l elenco resta quello completo dei muri', async () => {
+    const scene = await createDarkScene();
+    await addWalls(scene.id, [
+      { ax: 300, ay: 250, bx: 300, by: 350, kind: 'door', doorState: 'closed' },
+    ]);
+    const vision = await visionFor(scene.id, gmCookie);
+    expect(vision.walls).toHaveLength(1);
+    // Senza punti di vista non ci sono porte "in vista": lui le vede tutte.
+    expect(vision.visibleDoors).toEqual([]);
+  });
+});

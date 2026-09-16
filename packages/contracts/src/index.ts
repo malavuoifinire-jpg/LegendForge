@@ -484,6 +484,14 @@ export const sceneVisionStateSchema = sceneVisionSettingsSchema.extend({
   walls: z.array(wallSchema).nullable(),
   /** Solo per il Game Master: al giocatore arriva null. */
   lights: z.array(lightSourceSchema).nullable(),
+  /**
+   * Le porte che chi guarda ha davanti agli occhi.
+   *
+   * Non è una falla nel segreto dei muri: una porta che si vede si vede, e
+   * senza saperla lì nessuno potrebbe aprirla. Le porte fuori dal campo visivo
+   * non compaiono.
+   */
+  visibleDoors: z.array(wallSchema),
 });
 export type SceneVisionState = z.infer<typeof sceneVisionStateSchema>;
 
