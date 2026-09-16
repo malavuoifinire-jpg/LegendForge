@@ -31,6 +31,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
   const [gridVisible, setGridVisible] = useState(true);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ panX: 0, panY: 0, zoom: 1 });
+  const [canvasSize, setCanvasSize] = useState({ width: 800, height: 600 });
   const [picking, setPicking] = useState(false);
   const [pickedPoints, setPickedPoints] = useState<ImagePoint[]>([]);
   /** Anteprima locale della griglia mentre si trascina un cursore. */
@@ -154,12 +155,17 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
     if (!scene || !grid) return;
     setSaving(true);
     try {
-      // Nuova pedina al centro di ciò che si sta guardando.
-      const center = screenToImage({ x: 420, y: 300 }, viewport);
+      // Al centro di ciò che si sta guardando, scostata di una casella per
+      // ogni pedina già presente: non si accatastano tutte sullo stesso punto.
+      const center = screenToImage(
+        { x: canvasSize.width / 2, y: canvasSize.height / 2 },
+        viewport,
+      );
+      const index = scene.tokens.length;
       const created = await api.createToken(scene.id, {
-        name: `Pedina ${scene.tokens.length + 1}`,
-        x: center.x,
-        y: center.y,
+        name: `Pedina ${index + 1}`,
+        x: center.x + (index % 4) * grid.cellSizePx,
+        y: center.y + Math.floor(index / 4) * grid.cellSizePx,
         color: TOKEN_COLORS[scene.tokens.length % TOKEN_COLORS.length] ?? '#60a5fa',
       });
       setScene((current) => {
@@ -174,7 +180,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
     } finally {
       setSaving(false);
     }
-  }, [scene, grid, viewport]);
+  }, [scene, grid, viewport, canvasSize]);
 
   const removeToken = useCallback(async (id: string) => {
     try {
@@ -267,6 +273,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
               onMoveToken={moveTokenLocally}
               onCommitToken={commitToken}
               onViewportChange={setViewport}
+              onSizeChange={setCanvasSize}
               picking={picking}
               onPickPoint={handlePickPoint}
               pickedPoints={pickedPoints}

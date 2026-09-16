@@ -25,6 +25,8 @@ interface SceneCanvasProps {
   onSelectToken: (id: string | null) => void;
   onMoveToken: (id: string, position: ImagePoint) => void;
   onViewportChange?: (viewport: Viewport) => void;
+  /** Dimensioni correnti dell'area visibile, in pixel schermo. */
+  onSizeChange?: (size: { width: number; height: number }) => void;
   onHoverCell?: (cell: CellCoord | null) => void;
   /** Chiamata quando il trascinamento finisce: è il momento di salvare. */
   onCommitToken?: (id: string) => void;
@@ -55,6 +57,7 @@ export function SceneCanvas({
   onSelectToken,
   onMoveToken,
   onViewportChange,
+  onSizeChange,
   onHoverCell,
   onCommitToken,
   picking = false,
@@ -97,6 +100,10 @@ export function SceneCanvas({
   useEffect(() => {
     onViewportChange?.(viewport);
   }, [viewport, onViewportChange]);
+
+  useEffect(() => {
+    if (size.width > 0) onSizeChange?.(size);
+  }, [size, onSizeChange]);
 
   /* -------------------------------- disegno -------------------------------- */
 
