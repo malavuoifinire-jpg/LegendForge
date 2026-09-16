@@ -215,6 +215,25 @@ export type CampaignMember = z.infer<typeof campaignMemberSchema>;
 export const actorKindSchema = z.enum(['character', 'monster']);
 export type ActorKind = z.infer<typeof actorKindSchema>;
 
+export const specialSenseSchema = z.object({
+  name: z.string().trim().min(1).max(60),
+  rangeMeters: z.number().nonnegative().max(10000),
+});
+
+/**
+ * Sensi di un personaggio.
+ *
+ * I valori tipici — 18 e 36 metri di scurovisione — stanno nel RuleSet, non
+ * qui: questo è quanto ne ha questo personaggio, e lo decide il Game Master.
+ */
+export const actorVisionSchema = z.object({
+  /** null significa: fin dove arriva la scena. */
+  normalRangeMeters: z.number().nonnegative().max(10000).nullable(),
+  darkvisionMeters: z.number().nonnegative().max(10000),
+  specialSenses: z.array(specialSenseSchema).max(8),
+});
+export type ActorVision = z.infer<typeof actorVisionSchema>;
+
 export const actorSchema = entityMetaSchema.extend({
   campaignId: uuidSchema,
   kind: actorKindSchema,
@@ -223,6 +242,8 @@ export const actorSchema = entityMetaSchema.extend({
   color: hexColorSchema,
   /** Chi lo controlla. Vuoto significa: solo il Game Master. */
   ownerUserIds: z.array(uuidSchema),
+  /** Sensi: quanto lontano arriva lo sguardo di questo personaggio. */
+  vision: actorVisionSchema,
 });
 export type Actor = z.infer<typeof actorSchema>;
 
@@ -231,8 +252,18 @@ export const createActorInputSchema = z.object({
   kind: actorKindSchema.default('character'),
   sizeInCells: z.number().positive().max(20).default(1),
   color: hexColorSchema.default('#60a5fa'),
+  vision: actorVisionSchema.partial().optional(),
 });
 export type CreateActorInput = z.infer<typeof createActorInputSchema>;
+
+export const updateActorInputSchema = z.object({
+  version: entityVersionSchema,
+  name: z.string().trim().min(1).max(160).optional(),
+  sizeInCells: z.number().positive().max(20).optional(),
+  color: hexColorSchema.optional(),
+  vision: actorVisionSchema.partial().optional(),
+});
+export type UpdateActorInput = z.infer<typeof updateActorInputSchema>;
 
 export const setActorOwnersInputSchema = z.object({
   userIds: z.array(uuidSchema).max(8),

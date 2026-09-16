@@ -26,6 +26,7 @@ import type {
   SceneEvents,
   Token,
   UpdateGridInput,
+  UpdateActorInput,
   UpdateTokenInput,
   UploadTicket,
   Viewer,
@@ -150,6 +151,8 @@ export const api = {
   listActors: (campaignId: string) => request<Actor[]>(`/api/campaigns/${campaignId}/actors`),
   createActor: (campaignId: string, input: Partial<CreateActorInput> & { name: string }) =>
     post<Actor>(`/api/campaigns/${campaignId}/actors`, input),
+  updateActor: (actorId: string, input: UpdateActorInput) =>
+    patch<Actor>(`/api/actors/${actorId}`, input),
   setActorOwners: (actorId: string, userIds: string[]) =>
     request<Actor>(`/api/actors/${actorId}/owners`, {
       method: 'PUT',

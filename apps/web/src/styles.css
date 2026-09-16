@@ -1057,3 +1057,13 @@ button {
   font: inherit;
   font-size: 13px;
 }
+
+.field--inline {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.field--inline input[type='number'] {
+  width: 84px;
+}

@@ -816,3 +816,75 @@ describe('porte in vista', () => {
     expect(vision.visibleDoors).toEqual([]);
   });
 });
+
+describe('sensi del personaggio', () => {
+  it('si creano e si modificano dal Game Master', async () => {
+    const created = await harness.app.handle(
+      request('POST', `/api/campaigns/${campaignId}/actors`, {
+        cookie: gmCookie,
+        body: { kind: 'character', name: 'Nano', vision: { darkvisionMeters: 18 } },
+      }),
+    );
+    expect(created.status).toBe(201);
+    const actor = created.body as { id: string; version: number; vision: unknown };
+    expect(actor.vision).toEqual({
+      normalRangeMeters: null,
+      darkvisionMeters: 18,
+      specialSenses: [],
+    });
+
+    const updated = await harness.app.handle(
+      request('PATCH', `/api/actors/${actor.id}`, {
+        cookie: gmCookie,
+        body: {
+          version: actor.version,
+          vision: {
+            darkvisionMeters: 36,
+            specialSenses: [{ name: 'percezione tellurica', rangeMeters: 9 }],
+          },
+        },
+      }),
+    );
+    expect(updated.status).toBe(200);
+    expect((updated.body as { vision: { darkvisionMeters: number } }).vision.darkvisionMeters).toBe(
+      36,
+    );
+
+    const stale = await harness.app.handle(
+      request('PATCH', `/api/actors/${actor.id}`, {
+        cookie: gmCookie,
+        body: { version: actor.version, name: 'Altro' },
+      }),
+    );
+    expect(stale.status).toBe(409);
+  });
+
+  it('un giocatore non li tocca', async () => {
+    const player = await addPlayer();
+    const created = await harness.app.handle(
+      request('POST', `/api/campaigns/${campaignId}/actors`, {
+        cookie: gmCookie,
+        body: { kind: 'character', name: 'Elfo' },
+      }),
+    );
+    const actor = created.body as { id: string; version: number };
+    const response = await harness.app.handle(
+      request('PATCH', `/api/actors/${actor.id}`, {
+        cookie: player.cookie,
+        body: { version: actor.version, vision: { darkvisionMeters: 999 } },
+      }),
+    );
+    expect(response.status).toBe(403);
+  });
+
+  it('i sensi arrivano davvero al calcolo del campo visivo', async () => {
+    const scene = await createDarkScene();
+    const player = await addPlayer();
+    const eroe = await addCharacter(scene.id, player.userId, { x: 100, y: 100 }, 18);
+    void eroe;
+    expect((await visionFor(scene.id, player.cookie)).viewpoints[0]?.radiusMeters).toBeCloseTo(
+      18,
+      6,
+    );
+  });
+});

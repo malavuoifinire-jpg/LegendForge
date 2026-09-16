@@ -244,6 +244,38 @@ export function PartyPanel({ campaignId, playerSlots, joinCode }: PartyPanelProp
                   );
                 })}
               </div>
+              {/*
+                I sensi stanno sul personaggio, non sulla scena: valgono in ogni
+                scena in cui la sua pedina compare. I 18 e i 36 metri sono i
+                valori di regola, ma qui si può scrivere qualsiasi cosa.
+              */}
+              <div className="owner-picker">
+                <label className="field field--inline">
+                  <span className="field__label">Scurovisione (m)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    step={1.5}
+                    value={actor.vision.darkvisionMeters}
+                    disabled={busy}
+                    onChange={(event) => {
+                      const meters = Number(event.target.value);
+                      if (!Number.isFinite(meters) || meters < 0) return;
+                      void act(async () => {
+                        await api.updateActor(actor.id, {
+                          version: actor.version,
+                          vision: { darkvisionMeters: meters },
+                        });
+                      });
+                    }}
+                  />
+                </label>
+                <span className="panel__hint">
+                  {actor.vision.darkvisionMeters === 0
+                    ? 'Nessuna: al buio non vede.'
+                    : `${actor.vision.darkvisionMeters} m`}
+                </span>
+              </div>
             </li>
           ))}
         </ul>

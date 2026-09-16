@@ -1,8 +1,10 @@
 import {
   createActorInputSchema,
   setActorOwnersInputSchema,
+  updateActorInputSchema,
   type Actor,
   type ActorKind,
+  type ActorVision,
 } from '@legendforge/contracts';
 import { requireCampaignAccess, requireGameMaster } from '../access.js';
 import { requireViewer, type ServerContext } from '../context.js';
@@ -17,6 +19,9 @@ interface ActorRow {
   size_in_cells: number;
   color: string;
   owner_user_ids: string[] | null;
+  darkvision_meters: number | string;
+  normal_vision_meters: number | string | null;
+  special_senses: unknown;
   created_at: Date | string;
   updated_at: Date | string;
   version: number;
@@ -35,15 +40,44 @@ function toActor(row: ActorRow): Actor {
     sizeInCells: row.size_in_cells,
     color: row.color,
     ownerUserIds: row.owner_user_ids ?? [],
+    vision: toActorVision(row),
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
     version: row.version,
   };
 }
 
+/**
+ * Sensi del personaggio letti dalla riga.
+ *
+ * I sensi speciali sono JSON libero sul database: qui si tiene solo quello che
+ * ha la forma giusta, invece di fidarsi di com'è stato scritto.
+ */
+function toActorVision(row: ActorRow): ActorVision {
+  const senses: ActorVision['specialSenses'] = [];
+  if (Array.isArray(row.special_senses)) {
+    for (const entry of row.special_senses) {
+      if (typeof entry !== 'object' || entry === null) continue;
+      const record = entry as Record<string, unknown>;
+      const name = typeof record.name === 'string' ? record.name : null;
+      const range = typeof record.rangeMeters === 'number' ? record.rangeMeters : null;
+      if (name && range !== null && Number.isFinite(range) && range >= 0) {
+        senses.push({ name, rangeMeters: range });
+      }
+    }
+  }
+  return {
+    normalRangeMeters:
+      row.normal_vision_meters === null ? null : Number(row.normal_vision_meters),
+    darkvisionMeters: Number(row.darkvision_meters),
+    specialSenses: senses,
+  };
+}
+
 const SELECT_ACTORS = `
   SELECT a.id, a.campaign_id, a.kind, a.name, a.size_in_cells, a.color,
          ARRAY(SELECT o.user_id FROM actor_ownership o WHERE o.actor_id = a.id) AS owner_user_ids,
+         a.darkvision_meters, a.normal_vision_meters, a.special_senses,
          a.created_at, a.updated_at, a.version
     FROM actors a
    WHERE a.deleted_at IS NULL`;
@@ -78,9 +112,19 @@ export function actorRoutes(context: ServerContext): Route[] {
         );
         const input = parseBody(createActorInputSchema, request.body);
         const inserted = await context.pool.query<{ id: string }>(
-          `INSERT INTO actors (campaign_id, kind, name, size_in_cells, color)
-           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-          [access.campaignId, input.kind, input.name, input.sizeInCells, input.color],
+          `INSERT INTO actors (campaign_id, kind, name, size_in_cells, color,
+                               darkvision_meters, normal_vision_meters, special_senses)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+          [
+            access.campaignId,
+            input.kind,
+            input.name,
+            input.sizeInCells,
+            input.color,
+            input.vision?.darkvisionMeters ?? 0,
+            input.vision?.normalRangeMeters ?? null,
+            JSON.stringify(input.vision?.specialSenses ?? []),
+          ],
         );
         const { rows } = await context.pool.query<ActorRow>(`${SELECT_ACTORS} AND a.id = $1`, [
           inserted.rows[0]?.id,
@@ -88,6 +132,74 @@ export function actorRoutes(context: ServerContext): Route[] {
         const row = rows[0];
         if (!row) throw new Error('attore non leggibile dopo la creazione');
         return { status: 201, body: toActor(row) };
+      },
+    },
+
+    {
+      /**
+       * Modifica di un personaggio, sensi compresi.
+       *
+       * I sensi stanno qui e non nella scena: sono di chi li ha, e valgono in
+       * ogni scena in cui la sua pedina compare.
+       */
+      method: 'PATCH',
+      pattern: '/api/actors/:actorId',
+      async handle({ request, params }) {
+        const viewer = await requireViewer(context, request);
+        const actorId = params.actorId ?? '';
+        const owning = await context.pool.query<{ campaign_id: string }>(
+          `SELECT campaign_id FROM actors WHERE id = $1 AND deleted_at IS NULL`,
+          [actorId],
+        );
+        const campaignId = owning.rows[0]?.campaign_id;
+        if (!campaignId) throw new HttpError(404, 'not_found', 'Personaggio non trovato');
+        requireGameMaster(await requireCampaignAccess(context, viewer, campaignId));
+        const input = parseBody(updateActorInputSchema, request.body);
+
+        const current = await context.pool.query<ActorRow>(`${SELECT_ACTORS} AND a.id = $1`, [
+          actorId,
+        ]);
+        const before = current.rows[0];
+        if (!before) throw new HttpError(404, 'not_found', 'Personaggio non trovato');
+        const vision = { ...toActorVision(before), ...(input.vision ?? {}) };
+
+        const { rows } = await context.pool.query<{ id: string }>(
+          `UPDATE actors
+              SET name                 = COALESCE($3, name),
+                  size_in_cells        = COALESCE($4, size_in_cells),
+                  color                = COALESCE($5, color),
+                  darkvision_meters    = $6,
+                  normal_vision_meters = $7,
+                  special_senses       = $8::jsonb,
+                  updated_at = now(), version = version + 1
+            WHERE id = $1 AND version = $2 AND deleted_at IS NULL
+        RETURNING id`,
+          [
+            actorId,
+            input.version,
+            input.name ?? null,
+            input.sizeInCells ?? null,
+            input.color ?? null,
+            vision.darkvisionMeters,
+            vision.normalRangeMeters,
+            JSON.stringify(vision.specialSenses),
+          ],
+        );
+        if (rows.length === 0) {
+          throw new HttpError(
+            409,
+            'version_conflict',
+            'Il personaggio è stato modificato altrove',
+            toActor(before),
+          );
+        }
+
+        const updated = await context.pool.query<ActorRow>(`${SELECT_ACTORS} AND a.id = $1`, [
+          actorId,
+        ]);
+        const row = updated.rows[0];
+        if (!row) throw new Error('personaggio non leggibile dopo l aggiornamento');
+        return { status: 200, body: toActor(row) };
       },
     },
 
