@@ -4,14 +4,15 @@ Virtual tabletop web per sessioni di gioco di ruolo online: un Game Master e fin
 a otto giocatori attorno alla stessa mappa, con griglia calibrata, campo visivo,
 illuminazione, pedine e combattimento a turni.
 
-> **Stato: Milestone 2 completa nel codice, in verifica in produzione.**
-> Accesso con PIN e codice di recupero, campagne, caricamento mappe su storage
-> privato, rilevamento della griglia, calibrazione manuale da due incroci,
-> pedine agganciate dal server e persistenza verificata dopo il ricaricamento.
-> Account indipendenti, codice di campagna, inviti con link, personaggi
-> assegnati e sincronizzazione fra browser diversi. 154 test automatici, di
-> cui 87 di integrazione su PostgreSQL reale, più i flussi a due e tre
-> partecipanti provati in browser veri.
+> **Stato: Milestone 3 completa nel codice, in verifica in produzione.**
+> Accesso con PIN e codice di recupero, account indipendenti, codice di
+> campagna, inviti con link, personaggi assegnati. Caricamento mappe su storage
+> privato, rilevamento della griglia, calibrazione da due incroci, pedine
+> agganciate dal server, sincronizzazione fra browser diversi.
+> Muri, porte, finestre, campo visivo calcolato dal server, scurovisione,
+> sorgenti di luce, oscurità ambientale e fog of war a tre stati.
+> 250 test automatici, di cui 142 di integrazione su PostgreSQL reale, più i
+> flussi a due e tre partecipanti provati in browser veri.
 
 ## Principi
 
@@ -22,6 +23,11 @@ illuminazione, pedine e combattimento a turni.
   qualsiasi calcolo automatico.
 - **Le regole sono dati, non codice.** Nessun valore di regola è scritto nel
   motore: tutto passa da un profilo di regole configurabile per campagna.
+- **Quello che non si vede non viene spedito.** Una pedina fuori dal campo
+  visivo non è marcata come invisibile: non compare nella risposta, e nemmeno
+  negli aggiornamenti. Al giocatore non arrivano i muri, ma il poligono già
+  calcolato di quello che le sue pedine vedono: dalla risposta non si può
+  ricostruire la pianta di una stanza mai esplorata.
 - **Motore, dati e contenuti restano separati.** Nel repository non entrano testi,
   immagini o statistiche presi da manuali commerciali. I contenuti precaricati
   sono originali o esplicitamente utilizzabili.
@@ -40,7 +46,7 @@ e mostrate anche in caselle: 18 m corrispondono a 12 caselle, 36 m a 24.
 | API | Funzioni serverless su Vercel |
 | Database | PostgreSQL su Supabase, migrazioni versionate |
 | Storage | Supabase Storage (mappe e immagini delle pedine) |
-| Tempo reale | Supabase Realtime |
+| Tempo reale | Registro di eventi con attesa lunga sulla stessa API (ADR-013) |
 | Autenticazione | PIN e link d'invito gestiti dall'applicazione, sessioni con cookie HttpOnly |
 
 Monorepo TypeScript. Il codice di dominio è separato dal runtime, così resta
@@ -53,7 +59,7 @@ eseguibile anche fuori da Vercel.
 | 0 | Architettura, modello dati, sistema di coordinate, threat model | completata |
 | 1 | Mappa, canvas con zoom e pan, griglia, pedina, persistenza | completata |
 | 2 | Campagne, inviti, PIN, permessi, sincronizzazione in tempo reale | completata |
-| 3 | Muri, porte, linea di vista, luci, oscurità, fog of war | da fare |
+| 3 | Muri, porte, linea di vista, luci, oscurità, fog of war | completata |
 | 4 | Personaggi, mostri, oggetti, armi, incantesimi, librerie | da fare |
 | 5 | Iniziativa, turni, budget di movimento, diagonali, terreno | da fare |
 | 6 | Risoluzione delle azioni, dadi, aree d'effetto, effetti grafici | da fare |

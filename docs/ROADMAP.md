@@ -90,18 +90,35 @@ di due client; revoca degli inviti; tentativi ripetuti sul PIN.
 sorgenti di luce, oscurità ambientale, fog of war.
 
 **Accettazione**
-- [ ] Si disegnano segmenti e polilinee, si modificano i vertici, si cancella, con snap opzionale
-- [ ] Sono disponibili muro opaco, porta, finestra, ostacolo attraversabile ma opaco, ostacolo visibile ma non attraversabile
-- [ ] Le porte si aprono, chiudono e bloccano, e la visibilità cambia di conseguenza
-- [ ] Il poligono di visione di una pedina rispetta i muri: dietro un angolo non si vede
-- [ ] La scurovisione funziona a 18 m (12 caselle) e a 36 m (24 caselle)
-- [ ] Luce intensa e fioca, sorgenti fisse e torce collegate a pedine, con raggio e durata configurabili
-- [ ] Il fog of war distingue inesplorato, esplorato ma non visibile, e attualmente visibile
-- [ ] Il Game Master vede tutto e può passare all'anteprima dal punto di vista di un personaggio
-- [ ] Su una mappa grande con molti muri l'interazione resta fluida
+- [x] Si disegnano segmenti e polilinee, si modificano i vertici, si cancella, con snap opzionale
+- [x] Sono disponibili muro opaco, porta, finestra, ostacolo attraversabile ma opaco, ostacolo visibile ma non attraversabile
+- [x] Le porte si aprono, chiudono e bloccano, e la visibilità cambia di conseguenza
+- [x] Il poligono di visione di una pedina rispetta i muri: dietro un angolo non si vede
+- [x] La scurovisione funziona a 18 m (12 caselle) e a 36 m (24 caselle)
+- [x] Luce intensa e fioca, sorgenti fisse e torce collegate a pedine, con raggio configurabile
+- [x] Il fog of war distingue inesplorato, esplorato ma non visibile, e attualmente visibile
+- [x] Il Game Master vede tutto e può passare all'anteprima dal punto di vista di un personaggio
+- [x] Su una mappa grande con molti muri l'interazione resta fluida
 
 **Test obbligatori coperti**: intersezione dei raggi con i muri; visibilità
 dietro gli angoli; porte aperte e chiuse; scurovisione a 18 e 36 metri.
+
+**Misure** — pianta di 2000 muri su 4000×4000 px, 100 pedine, scurovisione a
+36 m, PostgreSQL locale:
+
+| | |
+|---|---|
+| Campo visivo di un giocatore | 40 ms (mediana), 69 ms (peggiore) |
+| Risposta del campo visivo | 2 KB, 16 vertici |
+| Lettura completa della scena | 38 ms |
+| Spostamento di una casella, controllo dei muri compreso | 14 ms |
+
+**Resta fuori**, da riprendere più avanti:
+- La durata delle torce è salvata (`remaining_minutes`) ma nessuno la consuma:
+  servirà il passaggio del tempo, che arriva con i turni in Milestone 5.
+- La forma della luce è un raggio circolare ritagliato sui muri; luce piena e
+  penombra non sono ancora due aree distinte per chi guarda.
+- L'elevazione è nel profilo sensoriale ma non entra nei calcoli.
 
 ---
 
