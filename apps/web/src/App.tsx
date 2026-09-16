@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Campaign, Scene, SessionState, Viewer } from '@legendforge/contracts';
 import { ApiError, api } from './api/client';
 import { AuthScreen } from './auth/AuthScreen';
+import { JoinScreen } from './auth/JoinScreen';
 import { CampaignsScreen } from './campaigns/CampaignsScreen';
 import { CampaignScreen } from './campaigns/CampaignScreen';
 import { SceneView } from './scene/SceneView';
@@ -11,6 +12,12 @@ type Boot =
   | { phase: 'loading' }
   | { phase: 'ready'; state: SessionState }
   | { phase: 'error'; message: string };
+
+/** Estrae il token da un indirizzo del tipo /entra/&lt;token&gt;. */
+function readInviteToken(): string | null {
+  const match = /^\/entra\/([^/]+)\/?$/u.exec(window.location.pathname);
+  return match?.[1] ? decodeURIComponent(match[1]) : null;
+}
 
 export function App() {
   const [boot, setBoot] = useState<Boot>({ phase: 'loading' });
@@ -65,6 +72,13 @@ export function App() {
     );
   }
 
+  // Un link d'invito porta direttamente alla schermata di ingresso, anche se
+  // in questo browser c'è già una sessione di qualcun altro.
+  const inviteToken = readInviteToken();
+  if (inviteToken && !viewer) {
+    return <JoinScreen token={inviteToken} onJoined={(next) => setViewer(next)} />;
+  }
+
   if (!viewer) {
     return <AuthScreen state={boot.state} onAuthenticated={(next) => setViewer(next)} />;
   }
@@ -99,11 +113,7 @@ export function App() {
 
       <main className="app__main">
         {scene && campaign ? (
-          <SceneView
-            sceneId={scene.id}
-            canEdit={campaign.viewerRole === 'game_master'}
-            onBack={() => setScene(null)}
-          />
+          <SceneView sceneId={scene.id} campaignId={campaign.id} onBack={() => setScene(null)} />
         ) : campaign ? (
           <CampaignScreen
             campaign={campaign}

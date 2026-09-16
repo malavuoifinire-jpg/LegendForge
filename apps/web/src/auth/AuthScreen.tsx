@@ -161,6 +161,7 @@ function LoginForm({
   onDone: (viewer: Viewer) => void;
   onRecover: () => void;
 }) {
+  const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
   const { busy, error, run } = useSubmit();
 
@@ -169,13 +170,23 @@ function LoginForm({
       onSubmit={(event) => {
         event.preventDefault();
         void run(async () => {
-          const { viewer } = await api.login(pin);
+          const { viewer } = await api.login(pin, displayName.trim() || undefined);
           if (viewer) onDone(viewer);
         });
       }}
     >
       <h1>Accesso</h1>
-      <p className="gate__lead">Inserisci il PIN scelto durante la configurazione.</p>
+      <p className="gate__lead">Il nome e il PIN che hai scelto al primo ingresso.</p>
+
+      <Field label="Nome">
+        <input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          required
+          autoFocus
+          autoComplete="nickname"
+        />
+      </Field>
 
       <Field label="PIN">
         <input
@@ -183,7 +194,6 @@ function LoginForm({
           value={pin}
           onChange={(event) => setPin(event.target.value)}
           required
-          autoFocus
           autoComplete="current-password"
         />
       </Field>

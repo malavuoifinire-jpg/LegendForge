@@ -31,6 +31,12 @@ interface SceneCanvasProps {
   /** Chiamata quando il trascinamento finisce: è il momento di salvare. */
   onCommitToken?: (id: string) => void;
   /**
+   * Quali pedine chi guarda può muovere. Le altre si possono selezionare per
+   * leggerne i dati, ma non trascinare: lo deciderebbe comunque il server, e
+   * lasciarle scivolare sotto il dito sarebbe una bugia.
+   */
+  canMoveToken?: (id: string) => boolean;
+  /**
    * Modalità di raccolta punti per la calibrazione: il clic indica un incrocio
    * invece di selezionare una pedina.
    */
@@ -60,6 +66,7 @@ export function SceneCanvas({
   onSizeChange,
   onHoverCell,
   onCommitToken,
+  canMoveToken,
   picking = false,
   onPickPoint,
   pickedPoints,
@@ -193,20 +200,23 @@ export function SceneCanvas({
       const token = tokenAtPoint(image);
 
       if (token && event.button === 0) {
-        interactionRef.current = {
-          kind: 'token',
-          id: token.id,
-          grabOffsetX: image.x - token.x,
-          grabOffsetY: image.y - token.y,
-        };
         onSelectToken(token.id);
-        return;
+        if (!canMoveToken || canMoveToken(token.id)) {
+          interactionRef.current = {
+            kind: 'token',
+            id: token.id,
+            grabOffsetX: image.x - token.x,
+            grabOffsetY: image.y - token.y,
+          };
+          return;
+        }
+        // Pedina non controllabile: il gesto diventa uno spostamento della vista.
       }
 
       if (event.button === 0) onSelectToken(null);
       interactionRef.current = { kind: 'pan', lastX: event.clientX, lastY: event.clientY };
     },
-    [viewport, tokenAtPoint, onSelectToken, picking, onPickPoint],
+    [viewport, tokenAtPoint, onSelectToken, picking, onPickPoint, canMoveToken],
   );
 
   const handlePointerMove = useCallback(

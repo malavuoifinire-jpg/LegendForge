@@ -841,3 +841,119 @@ button {
   cursor: pointer;
   font-family: inherit;
 }
+
+/* ---------------------------- tavolo e partecipanti ----------------------- */
+
+.party {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+  align-items: start;
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12px;
+}
+
+.row--column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+
+.row__main {
+  flex: 1;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.row--column .row__main {
+  color: var(--text);
+}
+
+.invite-fresh {
+  border: 1px solid rgba(126, 231, 255, 0.4);
+  background: rgba(126, 231, 255, 0.06);
+  border-radius: var(--radius);
+  padding: 11px;
+  margin-bottom: 12px;
+}
+
+.invite-link {
+  display: block;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 9px;
+  margin: 8px 0;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+  color: var(--accent);
+}
+
+.inline-form {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 11px;
+}
+
+.inline-form input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.inline-form input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.owner-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.owner {
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11px;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.owner--on {
+  border-color: var(--good);
+  color: var(--good);
+  background: rgba(74, 222, 128, 0.1);
+}
+
+.owner:disabled {
+  opacity: 0.5;
+  cursor: default;
+}

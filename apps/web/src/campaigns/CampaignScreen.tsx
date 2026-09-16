@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Campaign, MapAsset, Scene } from '@legendforge/contracts';
 import { ApiError, api, fieldMessages } from '../api/client';
 import { uploadMap, type UploadProgress } from '../scene/uploadMap';
+import { PartyPanel } from './PartyPanel';
 
 interface CampaignScreenProps {
   campaign: Campaign;
@@ -77,6 +78,8 @@ export function CampaignScreen({ campaign, onBack, onOpenScene }: CampaignScreen
           ))}
         </ul>
       )}
+
+      {isGameMaster && <PartyPanel campaignId={campaign.id} playerSlots={campaign.playerSlots} />}
 
       {creating && (
         <NewSceneDialog

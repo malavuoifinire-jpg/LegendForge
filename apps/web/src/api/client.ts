@@ -14,6 +14,15 @@ import type {
   SessionState,
   SetupInput,
   SetupResult,
+  AcceptInviteInput,
+  Actor,
+  CampaignMember,
+  CreateActorInput,
+  CreatedInvite,
+  CreateInviteInput,
+  Invite,
+  InvitePreview,
+  SceneEvents,
   Token,
   UpdateGridInput,
   UpdateTokenInput,
@@ -82,7 +91,8 @@ export const api = {
   health: () => request<Health>('/api/health'),
   sessionState: () => request<SessionState>('/api/session'),
   setup: (input: SetupInput) => post<SetupResult>('/api/setup', input),
-  login: (pin: string) => post<{ viewer: Viewer }>('/api/session', { pin }),
+  login: (pin: string, displayName?: string) =>
+    post<{ viewer: Viewer }>('/api/session', displayName ? { pin, displayName } : { pin }),
   logout: () => request<{ ok: boolean }>('/api/session', { method: 'DELETE' }),
   recover: (recoveryCode: string, newPin: string) =>
     post<{ recoveryCode: string }>('/api/session/recover', { recoveryCode, newPin }),
@@ -107,6 +117,30 @@ export const api = {
   updateToken: (tokenId: string, input: UpdateTokenInput) =>
     patch<Token>(`/api/tokens/${tokenId}`, input),
   deleteToken: (tokenId: string) => request<{ ok: boolean }>(`/api/tokens/${tokenId}`, { method: 'DELETE' }),
+
+  listInvites: (campaignId: string) => request<Invite[]>(`/api/campaigns/${campaignId}/invites`),
+  createInvite: (campaignId: string, input: Partial<CreateInviteInput>) =>
+    post<CreatedInvite>(`/api/campaigns/${campaignId}/invites`, input),
+  revokeInvite: (inviteId: string) =>
+    request<{ ok: boolean }>(`/api/invites/${inviteId}`, { method: 'DELETE' }),
+  previewInvite: (token: string) =>
+    request<InvitePreview>(`/api/invites/${encodeURIComponent(token)}/preview`),
+  acceptInvite: (token: string, input: AcceptInviteInput) =>
+    post<{ viewer: Viewer }>(`/api/invites/${encodeURIComponent(token)}/accept`, input),
+
+  listMembers: (campaignId: string) =>
+    request<CampaignMember[]>(`/api/campaigns/${campaignId}/members`),
+  listActors: (campaignId: string) => request<Actor[]>(`/api/campaigns/${campaignId}/actors`),
+  createActor: (campaignId: string, input: Partial<CreateActorInput> & { name: string }) =>
+    post<Actor>(`/api/campaigns/${campaignId}/actors`, input),
+  setActorOwners: (actorId: string, userIds: string[]) =>
+    request<Actor>(`/api/actors/${actorId}/owners`, {
+      method: 'PUT',
+      body: JSON.stringify({ userIds }),
+    }),
+
+  sceneEvents: (sceneId: string, since: number, signal: AbortSignal) =>
+    request<SceneEvents>(`/api/scenes/${sceneId}/events?since=${since}`, { signal }),
 };
 
 /** Elenco leggibile dei campi rifiutati da una convalida. */

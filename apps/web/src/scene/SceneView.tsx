@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { SceneDetail, Token } from '@legendforge/contracts';
+import type { Actor, SceneDetail, SceneEvent, Token } from '@legendforge/contracts';
 import {
   formatDistance,
   screenToImage,
@@ -13,16 +13,17 @@ import { loadImageFromUrl } from './imageAnalysis';
 import { BLANK_SURFACE_HEIGHT, BLANK_SURFACE_WIDTH, createBlankSurface } from './blankSurface';
 import type { CanvasMap } from './types';
 import { CalibrationPanel } from './CalibrationPanel';
+import { useSceneSync } from './useSceneSync';
 
 interface SceneViewProps {
   sceneId: string;
-  canEdit: boolean;
+  campaignId: string;
   onBack: () => void;
 }
 
 const TOKEN_COLORS = ['#4ade80', '#60a5fa', '#f87171', '#fbbf24', '#c084fc', '#f472b6'];
 
-export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
+export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
   const [scene, setScene] = useState<SceneDetail | null>(null);
   const [map, setMap] = useState<CanvasMap | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,9 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
   /** Anteprima locale della griglia mentre si trascina un cursore. */
   const [gridPreview, setGridPreview] = useState<Partial<GridConfiguration>>({});
   const tokensRef = useRef<Token[]>([]);
+  const draggingRef = useRef<string | null>(null);
+  const [actors, setActors] = useState<Actor[]>([]);
+  const [chosenActorId, setChosenActorId] = useState('');
 
   const load = useCallback(async () => {
     setError(null);
@@ -65,6 +69,49 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    api
+      .listActors(campaignId)
+      .then(setActors)
+      .catch(() => undefined);
+  }, [campaignId]);
+
+  /**
+   * Applica gli aggiornamenti che arrivano dal server.
+   *
+   * La pedina che si sta trascinando in questo momento viene lasciata stare:
+   * sarebbe la propria eco a strapparla di mano.
+   */
+  const applyEvents = useCallback((events: SceneEvent[]) => {
+    setScene((current) => {
+      if (!current) return current;
+      let tokens = current.tokens;
+      let grid = current.grid;
+      for (const event of events) {
+        if (event.kind === 'token.upserted') {
+          const incoming = event.payload as Token;
+          if (draggingRef.current === incoming.id) continue;
+          const index = tokens.findIndex((token) => token.id === incoming.id);
+          tokens = index === -1
+            ? [...tokens, incoming]
+            : tokens.map((token) => (token.id === incoming.id ? incoming : token));
+        } else if (event.kind === 'token.removed') {
+          const { id } = event.payload as { id: string };
+          if (draggingRef.current === id) continue;
+          tokens = tokens.filter((token) => token.id !== id);
+        } else if (event.kind === 'grid.updated') {
+          grid = event.payload as SceneDetail['grid'];
+        }
+      }
+      tokensRef.current = tokens;
+      return { ...current, tokens, grid };
+    });
+  }, []);
+
+  useSceneSync(scene ? scene.id : null, scene?.eventCursor ?? 0, applyEvents);
+
+  const canEdit = scene?.viewerRole === 'game_master';
 
   const grid = useMemo(() => {
     if (!scene) return null;
@@ -109,6 +156,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
   /* --------------------------------- pedine --------------------------------- */
 
   const moveTokenLocally = useCallback((id: string, position: ImagePoint) => {
+    draggingRef.current = id;
     setScene((current) => {
       if (!current) return current;
       const tokens = current.tokens.map((token) =>
@@ -122,7 +170,10 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
   const commitToken = useCallback(
     async (id: string) => {
       const token = tokensRef.current.find((candidate) => candidate.id === id);
-      if (!token) return;
+      if (!token) {
+        draggingRef.current = null;
+        return;
+      }
       try {
         // La posizione che vale è quella che torna dal server: è lui ad
         // applicare l'aggancio, non il browser.
@@ -146,6 +197,8 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
           setError(caught instanceof ApiError ? caught.message : 'Spostamento non salvato');
         }
         await load();
+      } finally {
+        draggingRef.current = null;
       }
     },
     [load],
@@ -162,8 +215,10 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
         viewport,
       );
       const index = scene.tokens.length;
+      const actor = actors.find((candidate) => candidate.id === chosenActorId) ?? null;
       const created = await api.createToken(scene.id, {
-        name: `Pedina ${index + 1}`,
+        name: actor ? actor.name : `Pedina ${index + 1}`,
+        actorId: actor ? actor.id : null,
         x: center.x + (index % 4) * grid.cellSizePx,
         y: center.y + Math.floor(index / 4) * grid.cellSizePx,
         color: TOKEN_COLORS[scene.tokens.length % TOKEN_COLORS.length] ?? '#60a5fa',
@@ -180,7 +235,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
     } finally {
       setSaving(false);
     }
-  }, [scene, grid, viewport, canvasSize]);
+  }, [scene, grid, viewport, canvasSize, actors, chosenActorId]);
 
   const removeToken = useCallback(async (id: string) => {
     try {
@@ -247,6 +302,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
           ← Torna alla campagna
         </button>
         <h1>{scene.name}</h1>
+        <span className="chip chip--confirmed">in ascolto</span>
         <span className="badge">
           {scene.map
             ? `${scene.map.name} · ${scene.map.widthPx}×${scene.map.heightPx} px`
@@ -274,6 +330,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
               onCommitToken={commitToken}
               onViewportChange={setViewport}
               onSizeChange={setCanvasSize}
+              canMoveToken={(id) => scene.controllableTokenIds.includes(id)}
               picking={picking}
               onPickPoint={handlePickPoint}
               pickedPoints={pickedPoints}
@@ -281,7 +338,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
           )}
           <p className="stage-note">
             Rotella per lo zoom, trascina per spostare la vista, doppio clic per inquadrare.
-            {canEdit ? ' Trascina una pedina per muoverla: la posizione la decide il server.' : ''}
+            {' Trascina una pedina tua per muoverla: la posizione la decide il server.'}
           </p>
         </section>
 
@@ -317,6 +374,21 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
                 </button>
               )}
             </header>
+
+            {canEdit && actors.length > 0 && (
+              <label className="field">
+                <span className="field__label">Personaggio della prossima pedina</span>
+                <select value={chosenActorId} onChange={(e) => setChosenActorId(e.target.value)}>
+                  <option value="">Nessuno — solo il Game Master la muove</option>
+                  {actors.map((actor) => (
+                    <option key={actor.id} value={actor.id}>
+                      {actor.name}
+                      {actor.ownerUserIds.length > 0 ? ' (assegnato)' : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
             {scene.tokens.length === 0 && <p className="panel__hint">Nessuna pedina sulla scena.</p>}
 
