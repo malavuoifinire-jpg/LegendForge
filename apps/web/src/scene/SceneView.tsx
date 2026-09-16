@@ -10,6 +10,7 @@ import {
 import { ApiError, api } from '../api/client';
 import { SceneCanvas } from './SceneCanvas';
 import { loadImageFromUrl } from './imageAnalysis';
+import { BLANK_SURFACE_HEIGHT, BLANK_SURFACE_WIDTH, createBlankSurface } from './blankSurface';
 import type { CanvasMap } from './types';
 import { CalibrationPanel } from './CalibrationPanel';
 
@@ -51,7 +52,9 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
           height: detail.map?.heightPx ?? image.naturalHeight,
         });
       } else {
-        setMap(null);
+        // Nessuna mappa: si lavora comunque, su una superficie neutra.
+        const blank = createBlankSurface();
+        setMap({ source: blank, width: BLANK_SURFACE_WIDTH, height: BLANK_SURFACE_HEIGHT });
       }
     } catch (caught) {
       setError(caught instanceof ApiError ? caught.message : 'Impossibile caricare la scena');
@@ -238,11 +241,11 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
           ← Torna alla campagna
         </button>
         <h1>{scene.name}</h1>
-        {scene.map && (
-          <span className="badge">
-            {scene.map.name} · {scene.map.widthPx}×{scene.map.heightPx} px
-          </span>
-        )}
+        <span className="badge">
+          {scene.map
+            ? `${scene.map.name} · ${scene.map.widthPx}×${scene.map.heightPx} px`
+            : 'senza mappa · superficie neutra'}
+        </span>
       </div>
 
       {error && <p className="gate__error">{error}</p>}
@@ -253,7 +256,7 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
           <div className="table__toolbar">
             <span className="readout">Zoom {Math.round(viewport.zoom * 100)}%</span>
           </div>
-          {map ? (
+          {map && (
             <SceneCanvas
               map={map}
               grid={grid}
@@ -268,10 +271,6 @@ export function SceneView({ sceneId, canEdit, onBack }: SceneViewProps) {
               onPickPoint={handlePickPoint}
               pickedPoints={pickedPoints}
             />
-          ) : (
-            <div className="empty">
-              <p>Questa scena non ha una mappa.</p>
-            </div>
           )}
           <p className="stage-note">
             Rotella per lo zoom, trascina per spostare la vista, doppio clic per inquadrare.
