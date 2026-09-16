@@ -366,6 +366,28 @@ function drawGrid(
   ctx.restore();
 }
 
+/**
+ * Sigla mostrata dentro la pedina.
+ *
+ * Due lettere iniziali non bastano: "Pedina 1" e "Pedina 2" darebbero la
+ * stessa sigla. Quando il nome finisce con un numero, quello è il dato che
+ * distingue; altrimenti si usano le iniziali delle prime due parole.
+ */
+function shortLabel(name: string): string {
+  const words = name.trim().split(/\s+/u).filter(Boolean);
+  const last = words[words.length - 1];
+  if (words.length > 1 && last && /^\d{1,2}$/u.test(last)) {
+    return `${(words[0] ?? '').charAt(0).toUpperCase()}${last}`;
+  }
+  if (words.length > 1) {
+    return words
+      .slice(0, 2)
+      .map((word) => word.charAt(0).toUpperCase())
+      .join('');
+  }
+  return name.slice(0, 2).toUpperCase();
+}
+
 function drawPickedPoint(
   ctx: CanvasRenderingContext2D,
   point: ImagePoint,
@@ -427,7 +449,7 @@ function drawToken(
     ctx.setLineDash([]);
   }
 
-  const label = token.name.slice(0, 2).toUpperCase();
+  const label = shortLabel(token.name);
   const fontSize = radius * 0.7;
   if (fontSize >= 8) {
     ctx.font = `600 ${fontSize}px ui-sans-serif, system-ui, sans-serif`;

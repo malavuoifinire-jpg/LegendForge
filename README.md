@@ -4,12 +4,11 @@ Virtual tabletop web per sessioni di gioco di ruolo online: un Game Master e fin
 a otto giocatori attorno alla stessa mappa, con griglia calibrata, campo visivo,
 illuminazione, pedine e combattimento a turni.
 
-> **Stato: Milestone 1 in corso.** Sono pronti la struttura del monorepo, il
-> nucleo di dominio con i suoi test, l'API serverless con il controllo di stato
-> e l'interfaccia con canvas, zoom, pan, overlay della griglia e pedine
-> trascinabili. Caricamento delle mappe, rilevamento automatico della griglia e
-> persistenza sono i prossimi passi. Nessuna funzionalità viene dichiarata
-> completa se non è verificabile end-to-end.
+> **Stato: Milestone 1 completa nel codice, in verifica in produzione.**
+> Accesso con PIN e codice di recupero, campagne, caricamento mappe su storage
+> privato, rilevamento della griglia, calibrazione manuale da due incroci,
+> pedine agganciate dal server e persistenza verificata dopo il ricaricamento.
+> 99 test automatici, di cui 41 di integrazione su PostgreSQL reale.
 
 ## Principi
 
@@ -49,7 +48,7 @@ eseguibile anche fuori da Vercel.
 | # | Contenuto | Stato |
 |---|---|---|
 | 0 | Architettura, modello dati, sistema di coordinate, threat model | completata |
-| 1 | Mappa, canvas con zoom e pan, griglia, pedina, persistenza | in corso |
+| 1 | Mappa, canvas con zoom e pan, griglia, pedina, persistenza | completata |
 | 2 | Campagne, inviti, PIN, permessi, sincronizzazione in tempo reale | da fare |
 | 3 | Muri, porte, linea di vista, luci, oscurità, fog of war | da fare |
 | 4 | Personaggi, mostri, oggetti, armi, incantesimi, librerie | da fare |
@@ -77,6 +76,10 @@ Variabili d'ambiente richieste dalle funzioni:
 |---|---|
 | `DATABASE_URL` | stringa di connessione PostgreSQL, quella del pooler in modalità transazione |
 | `DATABASE_SSL` | `require` (default), `insecure` per diagnosi temporanee, `disable` per un PostgreSQL locale |
+| `SUPABASE_URL` | base del progetto Supabase, per lo storage delle mappe |
+| `SUPABASE_SERVICE_ROLE_KEY` | chiave di servizio: resta sul server, non raggiunge mai il browser |
+| `SUPABASE_STORAGE_BUCKET` | nome del bucket, default `legendforge-assets` |
+| `MAX_UPLOAD_BYTES` | limite per file caricato, default 32 MB |
 
 ## Documentazione
 

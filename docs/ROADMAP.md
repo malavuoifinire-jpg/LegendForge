@@ -33,23 +33,31 @@ rilevamento preliminare della griglia, calibrazione manuale, overlay, creazione
 e movimento di una pedina, persistenza dopo il ricaricamento.
 
 **Accettazione**
-- [ ] Caricando un PNG o un JPEG la mappa appare sul canvas alle sue dimensioni reali
-- [ ] Un file che non è PNG o JPEG viene rifiutato con un messaggio comprensibile
-- [ ] Zoom e pan sono fluidi e il punto sotto il cursore resta fermo durante lo zoom
-- [ ] Il rilevamento propone passo, offset, rotazione e confidenza, e mostra sempre l'anteprima sovrapposta
-- [ ] Una proposta con confidenza bassa non è mai accettata da sola: serve la conferma
-- [ ] Il wizard di calibrazione accetta due incroci e il numero di caselle, e aggiorna l'overlay in tempo reale
-- [ ] Passo, offset, rotazione e snap sono regolabili a mano con effetto immediato
-- [ ] La conferma "una casella vale 1,5 metri" porta la scena allo stato confermato
-- [ ] L'immagine della mappa non viene mai modificata: la griglia è solo sovrapposta
-- [ ] Una pedina si crea, si trascina e si aggancia alla griglia
-- [ ] Ricaricando la pagina mappa, griglia e pedine sono dove erano
-- [ ] `lint`, `typecheck`, test unitari, test di integrazione e build passano
+- [x] Zoom e pan sono fluidi e il punto sotto il cursore resta fermo durante lo zoom
+- [x] Il rilevamento propone passo, offset, rotazione e confidenza, e mostra sempre l'anteprima sovrapposta
+- [x] Una proposta con confidenza bassa non è mai accettata da sola: serve la conferma
+- [x] Il wizard di calibrazione accetta due incroci e il numero di caselle, e aggiorna l'overlay in tempo reale
+- [x] Passo, offset, rotazione e snap sono regolabili a mano con effetto immediato
+- [x] La conferma "una casella vale 1,5 metri" porta la scena allo stato confermato
+- [x] L'immagine della mappa non viene mai modificata: la griglia è solo sovrapposta
+- [x] Una pedina si crea, si trascina e si aggancia alla griglia — l'aggancio lo calcola il server
+- [x] Ricaricando la pagina mappa, griglia e pedine sono dove erano
+- [x] `lint`, `typecheck`, test unitari, test di integrazione e build passano
+- [ ] Caricando un PNG o un JPEG la mappa appare sul canvas alle sue dimensioni reali — *da confermare sull'ambiente pubblicato: lo storage non è raggiungibile dall'ambiente di sviluppo*
+- [ ] Un file che non è PNG o JPEG viene rifiutato con un messaggio comprensibile — *idem*
+
+**Oltre il piano**: la milestone include anche la fetta minima di identità
+(proprietario dell'istanza, PIN, codice di recupero, sessione con cookie) e le
+campagne, perché pubblicare significa esporre l'API: un servizio aperto non è
+una base su cui costruire. Vedi ADR-016.
 
 **Test obbligatori coperti**: conversione pixel/caselle/metri; algoritmi
-diagonali; costo del percorso; persistenza di mappe, pedine e attori.
+diagonali; costo del percorso; persistenza di mappe, pedine e attori;
+proprietà delle pedine; impossibilità di ottenere dall'API dati nascosti;
+tentativi ripetuti sul PIN.
 
-**Fuori scope**: multiplayer, permessi per ruolo, muri, luci.
+**Fuori scope**: inviti, giocatori multipli, sincronizzazione in tempo reale,
+muri, luci.
 
 ---
 
