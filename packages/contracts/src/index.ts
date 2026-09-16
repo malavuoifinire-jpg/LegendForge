@@ -342,6 +342,151 @@ export const signedSourceSchema = z.object({
 });
 export type SignedSource = z.infer<typeof signedSourceSchema>;
 
+/* -------------------------------- visione -------------------------------- */
+
+/** Limite per richiesta quando si disegna una spezzata di muri. */
+export const MAX_WALLS_PER_REQUEST = 500;
+
+export const wallKindSchema = z.enum([
+  'opaque',
+  'door',
+  'window',
+  'sight_blocker',
+  'movement_blocker',
+]);
+export type WallKind = z.infer<typeof wallKindSchema>;
+
+export const doorStateSchema = z.enum(['closed', 'open', 'locked']);
+export type DoorState = z.infer<typeof doorStateSchema>;
+
+/** Estremi in pixel dell'immagine della mappa, come per le pedine. */
+const wallGeometry = {
+  ax: finiteNumber,
+  ay: finiteNumber,
+  bx: finiteNumber,
+  by: finiteNumber,
+};
+
+export const wallSchema = entityMetaSchema.extend({
+  sceneId: uuidSchema,
+  ...wallGeometry,
+  kind: wallKindSchema,
+  doorState: doorStateSchema,
+});
+export type Wall = z.infer<typeof wallSchema>;
+
+export const createWallInputSchema = z.object({
+  ...wallGeometry,
+  kind: wallKindSchema.default('opaque'),
+  doorState: doorStateSchema.default('closed'),
+});
+export type CreateWallInput = z.infer<typeof createWallInputSchema>;
+
+/** Una spezzata arriva come più segmenti in una sola richiesta. */
+export const createWallsInputSchema = z.object({
+  walls: z.array(createWallInputSchema).min(1).max(MAX_WALLS_PER_REQUEST),
+});
+export type CreateWallsInput = z.infer<typeof createWallsInputSchema>;
+
+export const updateWallInputSchema = z.object({
+  version: entityVersionSchema,
+  ax: finiteNumber.optional(),
+  ay: finiteNumber.optional(),
+  bx: finiteNumber.optional(),
+  by: finiteNumber.optional(),
+  kind: wallKindSchema.optional(),
+  doorState: doorStateSchema.optional(),
+});
+export type UpdateWallInput = z.infer<typeof updateWallInputSchema>;
+
+export const lightSourceSchema = entityMetaSchema.extend({
+  sceneId: uuidSchema,
+  /** Se valorizzato la luce segue la pedina: una torcia in mano. */
+  tokenId: uuidSchema.nullable(),
+  name: z.string(),
+  x: finiteNumber,
+  y: finiteNumber,
+  brightRadiusMeters: z.number().nonnegative().max(1000),
+  dimRadiusMeters: z.number().nonnegative().max(1000),
+  color: hexColorSchema,
+  enabled: z.boolean(),
+  /** Minuti di autonomia rimasti, null se la luce non si consuma. */
+  remainingMinutes: z.number().nonnegative().nullable(),
+});
+export type LightSource = z.infer<typeof lightSourceSchema>;
+
+export const createLightInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  tokenId: uuidSchema.nullable().optional(),
+  x: finiteNumber,
+  y: finiteNumber,
+  brightRadiusMeters: z.number().nonnegative().max(1000).default(6),
+  dimRadiusMeters: z.number().nonnegative().max(1000).default(12),
+  color: hexColorSchema.default('#ffd9a0'),
+  enabled: z.boolean().default(true),
+  remainingMinutes: z.number().nonnegative().max(100000).nullable().optional(),
+});
+export type CreateLightInput = z.infer<typeof createLightInputSchema>;
+
+export const updateLightInputSchema = z.object({
+  version: entityVersionSchema,
+  name: z.string().trim().min(1).max(120).optional(),
+  tokenId: uuidSchema.nullable().optional(),
+  x: finiteNumber.optional(),
+  y: finiteNumber.optional(),
+  brightRadiusMeters: z.number().nonnegative().max(1000).optional(),
+  dimRadiusMeters: z.number().nonnegative().max(1000).optional(),
+  color: hexColorSchema.optional(),
+  enabled: z.boolean().optional(),
+  remainingMinutes: z.number().nonnegative().max(100000).nullable().optional(),
+});
+export type UpdateLightInput = z.infer<typeof updateLightInputSchema>;
+
+/** Impostazioni di visione della scena, di competenza del Game Master. */
+export const sceneVisionSettingsSchema = z.object({
+  visionEnabled: z.boolean(),
+  fogEnabled: z.boolean(),
+  ambientDarkness: z.number().min(0).max(1),
+  sceneReachMeters: z.number().positive().max(10000),
+});
+export type SceneVisionSettings = z.infer<typeof sceneVisionSettingsSchema>;
+
+export const updateSceneVisionInputSchema = sceneVisionSettingsSchema.partial().extend({
+  /** Versione della scena letta dal client. */
+  version: entityVersionSchema,
+});
+export type UpdateSceneVisionInput = z.infer<typeof updateSceneVisionInputSchema>;
+
+export const imagePointSchema = z.object({ x: finiteNumber, y: finiteNumber });
+export type ImagePointDto = z.infer<typeof imagePointSchema>;
+
+/**
+ * Che cosa vede una pedina.
+ *
+ * Il poligono è calcolato dal server: al giocatore non arrivano i muri, quindi
+ * dalla risposta non si può ricostruire la pianta della mappa.
+ */
+export const viewpointSchema = z.object({
+  tokenId: uuidSchema,
+  origin: imagePointSchema,
+  radiusPx: z.number().nonnegative(),
+  radiusMeters: z.number().nonnegative(),
+  source: z.enum(['normale', 'scurovisione', 'senso speciale', 'luce', 'nessuna']),
+  polygon: z.array(imagePointSchema),
+});
+export type Viewpoint = z.infer<typeof viewpointSchema>;
+
+export const sceneVisionStateSchema = sceneVisionSettingsSchema.extend({
+  /** Da quale punto di vista è calcolato: una pedina, o l'onniscienza del GM. */
+  perspective: z.enum(['game_master', 'tokens']),
+  viewpoints: z.array(viewpointSchema),
+  /** Solo per il Game Master: al giocatore arriva null. */
+  walls: z.array(wallSchema).nullable(),
+  /** Solo per il Game Master: al giocatore arriva null. */
+  lights: z.array(lightSourceSchema).nullable(),
+});
+export type SceneVisionState = z.infer<typeof sceneVisionStateSchema>;
+
 /* ---------------------------------- scene --------------------------------- */
 
 export const gridStatusSchema = z.enum(['unconfigured', 'suggested', 'confirmed']);
@@ -417,7 +562,14 @@ export type Scene = z.infer<typeof sceneSchema>;
 
 export const sceneEventSchema = z.object({
   id: z.number().int().nonnegative(),
-  kind: z.enum(['token.upserted', 'token.removed', 'grid.updated']),
+  kind: z.enum([
+    'token.upserted',
+    'token.removed',
+    'grid.updated',
+    'wall.changed',
+    'light.changed',
+    'vision.changed',
+  ]),
   payload: z.unknown(),
   at: isoDateSchema,
 });
@@ -435,6 +587,8 @@ export const sceneDetailSchema = sceneSchema.extend({
   /** URL firmato dell'immagine, valido per poco. */
   mapSource: signedSourceSchema.nullable(),
   tokens: z.array(tokenSchema),
+  /** Impostazioni di visione, così il client sa se disegnare il buio. */
+  vision: sceneVisionSettingsSchema,
   /** Punto di partenza per seguire gli aggiornamenti della scena. */
   eventCursor: z.number().int().nonnegative(),
   /** Ruolo di chi guarda, dentro questa campagna. */

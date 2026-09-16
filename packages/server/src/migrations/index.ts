@@ -293,8 +293,78 @@ CREATE TABLE rate_limits (
 ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
 `;
 
+const VISION = `
+-- Muri della scena. Un muro è un segmento: la domanda "si vede?" e la domanda
+-- "si passa?" sono entrambe incroci fra un segmento e un altro.
+CREATE TABLE scene_walls (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scene_id    uuid NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  ax          double precision NOT NULL,
+  ay          double precision NOT NULL,
+  bx          double precision NOT NULL,
+  by          double precision NOT NULL,
+  kind        text NOT NULL DEFAULT 'opaque'
+              CHECK (kind IN ('opaque', 'door', 'window', 'sight_blocker', 'movement_blocker')),
+  door_state  text NOT NULL DEFAULT 'closed'
+              CHECK (door_state IN ('closed', 'open', 'locked')),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  version     integer NOT NULL DEFAULT 1,
+  -- Un muro lungo zero non ferma niente e manderebbe in crisi i conti.
+  CHECK (ax <> bx OR ay <> by)
+);
+CREATE INDEX scene_walls_scene_idx ON scene_walls (scene_id);
+
+-- Sorgenti di luce: fisse sulla mappa oppure agganciate a una pedina.
+CREATE TABLE scene_lights (
+  id                    uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scene_id              uuid NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  token_id              uuid REFERENCES tokens(id) ON DELETE CASCADE,
+  name                  text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 120),
+  x                     double precision NOT NULL,
+  y                     double precision NOT NULL,
+  bright_radius_meters  double precision NOT NULL DEFAULT 6 CHECK (bright_radius_meters >= 0),
+  dim_radius_meters     double precision NOT NULL DEFAULT 12 CHECK (dim_radius_meters >= 0),
+  color                 text NOT NULL DEFAULT '#ffd9a0' CHECK (color ~* '^#[0-9a-f]{6}$'),
+  enabled               boolean NOT NULL DEFAULT true,
+  -- Minuti di autonomia rimasti. NULL significa che non si consuma.
+  remaining_minutes     double precision CHECK (remaining_minutes IS NULL OR remaining_minutes >= 0),
+  created_at            timestamptz NOT NULL DEFAULT now(),
+  updated_at            timestamptz NOT NULL DEFAULT now(),
+  version               integer NOT NULL DEFAULT 1
+);
+CREATE INDEX scene_lights_scene_idx ON scene_lights (scene_id);
+CREATE INDEX scene_lights_token_idx ON scene_lights (token_id) WHERE token_id IS NOT NULL;
+
+-- Impostazioni di visione della scena. Di base la visione è spenta: una scena
+-- appena creata si vede tutta, e il Game Master accende il buio quando ha
+-- finito di disegnare i muri.
+ALTER TABLE scenes
+  ADD COLUMN vision_enabled     boolean NOT NULL DEFAULT false,
+  ADD COLUMN fog_enabled        boolean NOT NULL DEFAULT true,
+  ADD COLUMN ambient_darkness   double precision NOT NULL DEFAULT 0
+             CHECK (ambient_darkness >= 0 AND ambient_darkness <= 1),
+  -- Fin dove arriva lo sguardo quando la vista normale è illimitata.
+  ADD COLUMN scene_reach_meters double precision NOT NULL DEFAULT 60
+             CHECK (scene_reach_meters > 0);
+
+-- Sensi di un attore. I valori di regola stanno nel RuleSet, qui c'è solo
+-- quanto ne ha questo personaggio.
+ALTER TABLE actors
+  ADD COLUMN darkvision_meters    double precision NOT NULL DEFAULT 0
+             CHECK (darkvision_meters >= 0),
+  -- NULL significa "fin dove arriva la scena".
+  ADD COLUMN normal_vision_meters double precision
+             CHECK (normal_vision_meters IS NULL OR normal_vision_meters >= 0),
+  ADD COLUMN special_senses       jsonb NOT NULL DEFAULT '[]'::jsonb;
+
+ALTER TABLE scene_walls  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scene_lights ENABLE ROW LEVEL SECURITY;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init', sql: INIT },
   { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
   { name: '0003_join_codes', sql: JOIN_CODES },
+  { name: '0004_vision', sql: VISION },
 ];

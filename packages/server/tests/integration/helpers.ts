@@ -39,7 +39,8 @@ export async function createHarness(): Promise<TestHarness> {
       // svuota insieme alle altre: la riga singola va ricreata, altrimenti i
       // test partirebbero da uno stato che in produzione non esiste.
       await pool.query(`
-        TRUNCATE scene_events, tokens, actor_ownership, actors, grid_configurations,
+        TRUNCATE scene_events, scene_lights, scene_walls, tokens, actor_ownership, actors,
+                 grid_configurations,
                  scenes, map_assets, assets, invites, campaign_memberships, campaigns,
                  sessions, instance_state, users
         RESTART IDENTITY CASCADE`);
@@ -54,12 +55,12 @@ export async function createHarness(): Promise<TestHarness> {
 export function request(
   method: string,
   path: string,
-  options: { body?: unknown; cookie?: string } = {},
+  options: { body?: unknown; cookie?: string; query?: Record<string, string> } = {},
 ): AppRequest {
   return {
     method,
     path,
-    query: {},
+    query: options.query ?? {},
     headers: {
       'user-agent': 'vitest',
       ...(options.cookie ? { cookie: options.cookie } : {}),

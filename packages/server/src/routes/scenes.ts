@@ -6,7 +6,6 @@ import {
   type Scene,
   type SceneDetail,
   type SceneEvents,
-  type Token,
 } from '@legendforge/contracts';
 import { DEFAULT_RULE_SET } from '@legendforge/core';
 import { requireCampaignAccess, requireGameMaster, requireSceneAccess } from '../access.js';
@@ -23,7 +22,7 @@ import {
 import { controlLevel } from './tokens.js';
 import { parseBody } from '../validate.js';
 import { SELECT_MAPS, SOURCE_URL_SECONDS, toMapAsset } from './maps.js';
-import { toToken, type TokenRow } from './tokens.js';
+import { visibleTokensForViewer } from './vision.js';
 
 interface SceneRow {
   id: string;
@@ -186,18 +185,15 @@ export function sceneRoutes(context: ServerContext): Route[] {
         const scene = sceneRows.rows[0];
         if (!scene) throw new HttpError(404, 'not_found', 'Scena non trovata');
 
-        // Le pedine nascoste non vengono marcate: per chi non è Game Master
-        // non compaiono affatto nella risposta.
-        const isGameMaster = access.role === 'game_master';
-        const tokenRows = await context.pool.query<TokenRow>(
-          `SELECT id, scene_id, actor_id, name, x, y, size_in_cells, rotation_deg,
-                  color, disposition, hidden, created_at, updated_at, version
-             FROM tokens
-            WHERE scene_id = $1 ${isGameMaster ? '' : 'AND hidden = false'}
-            ORDER BY created_at ASC`,
-          [access.sceneId],
+        // Le pedine nascoste o fuori dal campo visivo non vengono marcate: per
+        // chi non è Game Master non compaiono affatto nella risposta. La regola
+        // sta in un posto solo, condiviso con il calcolo del campo visivo.
+        const { tokens, vision } = await visibleTokensForViewer(
+          context,
+          access.sceneId,
+          viewer.id,
+          access.role,
         );
-        const tokens: Token[] = tokenRows.rows.map(toToken);
 
         let map = null;
         let mapSource = null;
@@ -237,6 +233,7 @@ export function sceneRoutes(context: ServerContext): Route[] {
           map,
           mapSource,
           tokens,
+          vision: vision.settings,
           eventCursor: await latestCursor(context.pool, access.sceneId),
           viewerRole: access.role,
           controllableTokenIds,

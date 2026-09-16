@@ -11,7 +11,21 @@ import type { DatabasePool } from './db.js';
 
 export type EventVisibility = 'all' | 'game_master';
 
-export type SceneEventKind = 'token.upserted' | 'token.removed' | 'grid.updated';
+export type SceneEventKind =
+  | 'token.upserted'
+  | 'token.removed'
+  | 'grid.updated'
+  /**
+   * Muri, luci e impostazioni di visione cambiati.
+   *
+   * Questi eventi non portano dati: dicono soltanto che qualcosa è cambiato, e
+   * ogni client rilegge il proprio stato passando dalla propria
+   * autorizzazione. Un evento destinato a tutti non può contenere la pianta di
+   * una stanza che qualcuno non ha ancora visto.
+   */
+  | 'wall.changed'
+  | 'light.changed'
+  | 'vision.changed';
 
 export interface SceneEvent {
   id: number;
