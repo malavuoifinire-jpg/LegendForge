@@ -1,5 +1,16 @@
+import { rootCertificates } from 'node:tls';
 import pg from 'pg';
 import type { ServerEnv } from './env.js';
+import { SUPABASE_CA_BUNDLE } from './supabase-ca.js';
+
+/**
+ * Le autorità pubbliche più quella di Supabase.
+ *
+ * Passando `ca` a Node si sostituisce l'intero deposito: aggiungiamo la radice
+ * di Supabase a quelle di sistema invece di rimpiazzarle, così la stessa
+ * configurazione vale anche per un database ospitato altrove.
+ */
+const TRUSTED_AUTHORITIES = [...rootCertificates, ...SUPABASE_CA_BUNDLE];
 
 // Gli interi a 64 bit e i numeric tornerebbero come stringhe: nel dominio del
 // tavolo virtuale non usiamo valori fuori dal range sicuro di JavaScript.
@@ -28,7 +39,9 @@ export function getPool(env: ServerEnv): DatabasePool | null {
     ssl:
       env.databaseSsl === 'disable'
         ? false
-        : { rejectUnauthorized: env.databaseSsl === 'require' },
+        : env.databaseSsl === 'insecure'
+          ? { rejectUnauthorized: false }
+          : { rejectUnauthorized: true, ca: TRUSTED_AUTHORITIES },
   });
   cachedPool.on('error', () => {
     // Una connessione inattiva caduta non deve abbattere il processo.
