@@ -68,15 +68,15 @@ recupero, assegnazione dei personaggi, sincronizzazione in tempo reale,
 permessi applicati sul server.
 
 **Accettazione**
-- [ ] Chi crea la campagna ne diventa Game Master, con da 1 a 8 posti giocatore
-- [ ] Il Game Master imposta un PIN e riceve un codice di recupero mostrato una sola volta
-- [ ] I link d'invito si creano, revocano e rigenerano; un link revocato non funziona più
-- [ ] Un giocatore entra dal link, sceglie nome e PIN, e ottiene una sessione persistente
-- [ ] Il Game Master assegna uno o più personaggi a ogni giocatore
-- [ ] Un giocatore controlla solo i personaggi assegnati; il Game Master controlla tutto
-- [ ] Muovendo una pedina, gli altri client la vedono muoversi senza ricaricare
-- [ ] Tentativi ripetuti sul PIN portano a rallentamento e blocco temporaneo
-- [ ] Chiamando l'API con la sessione di un giocatore non si ottengono dati nascosti
+- [x] Chi crea la campagna ne diventa Game Master, con da 1 a 8 posti giocatore
+- [x] Il Game Master imposta un PIN e riceve un codice di recupero mostrato una sola volta
+- [x] I link d'invito si creano, revocano e rigenerano; un link revocato non funziona più
+- [x] Un giocatore entra dal link, sceglie nome e PIN, e ottiene una sessione persistente
+- [x] Il Game Master assegna uno o più personaggi a ogni giocatore
+- [x] Un giocatore controlla solo i personaggi assegnati; il Game Master controlla tutto
+- [x] Muovendo una pedina, gli altri client la vedono muoversi senza ricaricare
+- [x] Tentativi ripetuti sul PIN portano a rallentamento e blocco temporaneo
+- [x] Chiamando l'API con la sessione di un giocatore non si ottengono dati nascosti
 
 **Test obbligatori coperti**: proprietà delle pedine; impossibilità di modificare
 pedine altrui; impossibilità di ottenere dall'API dati nascosti; sincronizzazione

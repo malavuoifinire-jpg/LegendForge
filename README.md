@@ -4,11 +4,13 @@ Virtual tabletop web per sessioni di gioco di ruolo online: un Game Master e fin
 a otto giocatori attorno alla stessa mappa, con griglia calibrata, campo visivo,
 illuminazione, pedine e combattimento a turni.
 
-> **Stato: Milestone 1 completa nel codice, in verifica in produzione.**
+> **Stato: Milestone 2 completa nel codice, in verifica in produzione.**
 > Accesso con PIN e codice di recupero, campagne, caricamento mappe su storage
 > privato, rilevamento della griglia, calibrazione manuale da due incroci,
 > pedine agganciate dal server e persistenza verificata dopo il ricaricamento.
-> 99 test automatici, di cui 41 di integrazione su PostgreSQL reale.
+> Inviti, giocatori con PIN proprio, personaggi assegnati e sincronizzazione
+> fra browser diversi. 136 test automatici, di cui 69 di integrazione su
+> PostgreSQL reale, più il flusso a due partecipanti in browser veri.
 
 ## Principi
 
@@ -49,7 +51,7 @@ eseguibile anche fuori da Vercel.
 |---|---|---|
 | 0 | Architettura, modello dati, sistema di coordinate, threat model | completata |
 | 1 | Mappa, canvas con zoom e pan, griglia, pedina, persistenza | completata |
-| 2 | Campagne, inviti, PIN, permessi, sincronizzazione in tempo reale | da fare |
+| 2 | Campagne, inviti, PIN, permessi, sincronizzazione in tempo reale | completata |
 | 3 | Muri, porte, linea di vista, luci, oscurità, fog of war | da fare |
 | 4 | Personaggi, mostri, oggetti, armi, incantesimi, librerie | da fare |
 | 5 | Iniziativa, turni, budget di movimento, diagonali, terreno | da fare |

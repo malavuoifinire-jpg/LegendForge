@@ -210,14 +210,31 @@ salvato per campagna e validato da uno schema. Il codice legge il profilo, non
 contiene i valori. Il Game Master può modificarli, e può comunque scavalcare
 qualunque calcolo caso per caso.
 
-### ADR-013 — Realtime come trasporto, non come fonte di verità
+### ADR-013 — La sincronizzazione passa dalla nostra API, non da un canale esterno
 
-Il server pubblica eventi su canali distinti: uno per il Game Master e uno per
-ogni giocatore. Ogni payload contiene solo ciò che quel destinatario è
-autorizzato a vedere. Il client applica l'evento in modo ottimistico e, in caso
-di dubbio o riconnessione, rilegge lo stato dall'API. Le sottoscrizioni dirette
-alle modifiche delle tabelle non vengono usate: esporrebbero righe intere,
-comprese quelle nascoste.
+Ogni cambiamento di scena lascia una riga in un registro append-only, con la
+propria visibilità decisa al momento della scrittura. I client chiedono gli
+eventi successivi a un cursore con una richiesta in attesa lunga: il server
+tiene aperta la richiesta finché non ha qualcosa da consegnare, fino a venti
+secondi, poi il client riprova. Un movimento arriva agli altri partecipanti
+quasi subito, senza interrogare il server di continuo.
+
+Perché non i canali di Supabase. Servirebbe un token che Supabase riconosca:
+il progetto usa chiavi asimmetriche, quindi non possiamo firmarne uno con un
+segreto condiviso, e un canale pubblico significherebbe accesso per nome
+indovinabile, cioè un segreto travestito da indirizzo. Restando sulla nostra
+API, la consegna attraversa esattamente la stessa autorizzazione della lettura
+completa: esiste **un solo posto** in cui si decide che cosa una persona può
+vedere, e non due che devono restare d'accordo.
+
+Il costo è una richiesta tenuta aperta per partecipante, al massimo nove per
+campagna. Il guadagno è che una pedina nascosta non può trapelare da un secondo
+percorso che qualcuno ha dimenticato di filtrare.
+
+Quando servirà davvero una latenza inferiore — particelle, movimento continuo
+condiviso — la strada è un'integrazione a chiavi pubbliche verso Supabase, con
+i canali privati. Il registro degli eventi resta com'è: cambierebbe solo il
+mezzo di consegna.
 
 ### ADR-014 — Le migrazioni sono versionate e automatiche, mai manuali
 

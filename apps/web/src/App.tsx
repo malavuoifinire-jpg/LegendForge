@@ -90,7 +90,7 @@ export function App() {
           <span className="brand__mark" aria-hidden="true" />
           <span className="brand__name">LegendForge</span>
         </div>
-        <span className="badge">Milestone 1 · in costruzione</span>
+        <span className="badge">Milestone 2 · in costruzione</span>
         <div className="app__bar-spacer" />
         <button
           type="button"
