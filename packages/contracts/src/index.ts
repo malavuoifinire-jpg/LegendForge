@@ -162,6 +162,159 @@ export type Campaign = z.infer<typeof campaignSchema>;
 export const SUPPORTED_MAP_MIME_TYPES = ['image/png', 'image/jpeg'] as const;
 export type SupportedMapMimeType = (typeof SUPPORTED_MAP_MIME_TYPES)[number];
 
+export const MAX_MAP_DIMENSION_PX = 20_000;
+
+/** Esito del rilevamento automatico, calcolato nel browser e validato qui. */
+export const gridDetectionSchema = z.object({
+  cellSizePx: z.number().positive().max(4096).nullable(),
+  offsetX: finiteNumber.min(-4096).max(4096).nullable(),
+  offsetY: finiteNumber.min(-4096).max(4096).nullable(),
+  rotationDeg: finiteNumber.min(-15).max(15).nullable(),
+  confidence: z.number().min(0).max(1),
+  axisAgreement: z.number().min(0).max(1),
+  analyzedWidth: z.number().int().positive(),
+  analyzedHeight: z.number().int().positive(),
+  elapsedMs: z.number().min(0),
+});
+export type GridDetection = z.infer<typeof gridDetectionSchema>;
+
+/** Richiesta di un permesso di caricamento a tempo. */
+export const requestUploadInputSchema = z.object({
+  fileName: z.string().trim().min(1).max(200),
+  mimeType: z.enum(SUPPORTED_MAP_MIME_TYPES),
+  byteSize: z.number().int().positive(),
+});
+export type RequestUploadInput = z.infer<typeof requestUploadInputSchema>;
+
+export const uploadTicketSchema = z.object({
+  assetId: uuidSchema,
+  /** Indirizzo a cui il browser invia il file. */
+  uploadUrl: z.string(),
+  token: z.string(),
+  /** Scadenza indicativa del permesso. */
+  expiresAt: isoDateSchema,
+});
+export type UploadTicket = z.infer<typeof uploadTicketSchema>;
+
+/** Conclusione del caricamento: il server rilegge i metadati reali. */
+export const finalizeMapInputSchema = z.object({
+  assetId: uuidSchema,
+  name: z.string().trim().min(1).max(160),
+  widthPx: z.number().int().positive().max(MAX_MAP_DIMENSION_PX),
+  heightPx: z.number().int().positive().max(MAX_MAP_DIMENSION_PX),
+  detection: gridDetectionSchema.nullable().optional(),
+});
+export type FinalizeMapInput = z.infer<typeof finalizeMapInputSchema>;
+
+export const mapAssetSchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  assetId: uuidSchema,
+  name: z.string(),
+  mimeType: z.string(),
+  widthPx: z.number().int().positive(),
+  heightPx: z.number().int().positive(),
+  byteSize: z.number().int().nonnegative(),
+  detection: gridDetectionSchema.nullable(),
+});
+export type MapAsset = z.infer<typeof mapAssetSchema>;
+
+export const signedSourceSchema = z.object({
+  url: z.string(),
+  expiresAt: isoDateSchema,
+});
+export type SignedSource = z.infer<typeof signedSourceSchema>;
+
+/* ---------------------------------- scene --------------------------------- */
+
+export const gridStatusSchema = z.enum(['unconfigured', 'suggested', 'confirmed']);
+export type GridStatus = z.infer<typeof gridStatusSchema>;
+
+export const gridStateSchema = gridConfigurationSchema.extend({
+  status: gridStatusSchema,
+  /** Versione della sola griglia, per aggiornamenti mirati. */
+  version: entityVersionSchema,
+});
+export type GridState = z.infer<typeof gridStateSchema>;
+
+export const tokenDispositionSchema = z.enum(['friendly', 'neutral', 'hostile']);
+export type TokenDisposition = z.infer<typeof tokenDispositionSchema>;
+
+export const tokenSchema = entityMetaSchema.extend({
+  sceneId: uuidSchema,
+  actorId: uuidSchema.nullable(),
+  name: z.string(),
+  /** Centro della pedina in pixel dell'immagine della mappa. */
+  x: finiteNumber,
+  y: finiteNumber,
+  sizeInCells: z.number().positive().max(20),
+  rotationDeg: finiteNumber,
+  color: hexColorSchema,
+  disposition: tokenDispositionSchema,
+  hidden: z.boolean(),
+});
+export type Token = z.infer<typeof tokenSchema>;
+
+export const createTokenInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  x: finiteNumber,
+  y: finiteNumber,
+  sizeInCells: z.number().positive().max(20).default(1),
+  color: hexColorSchema.default('#60a5fa'),
+  disposition: tokenDispositionSchema.default('neutral'),
+  hidden: z.boolean().default(false),
+  /** Se true il server aggancia la posizione alla griglia della scena. */
+  snapToGrid: z.boolean().default(true),
+});
+export type CreateTokenInput = z.infer<typeof createTokenInputSchema>;
+
+export const updateTokenInputSchema = z.object({
+  /** Versione letta dal client: l'aggiornamento è rifiutato se obsoleta. */
+  version: entityVersionSchema,
+  name: z.string().trim().min(1).max(120).optional(),
+  x: finiteNumber.optional(),
+  y: finiteNumber.optional(),
+  sizeInCells: z.number().positive().max(20).optional(),
+  rotationDeg: finiteNumber.optional(),
+  color: hexColorSchema.optional(),
+  disposition: tokenDispositionSchema.optional(),
+  hidden: z.boolean().optional(),
+  snapToGrid: z.boolean().optional(),
+});
+export type UpdateTokenInput = z.infer<typeof updateTokenInputSchema>;
+
+export const sceneSchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  name: z.string(),
+  mapAssetId: uuidSchema.nullable(),
+  grid: gridStateSchema,
+  tokenCount: z.number().int().nonnegative(),
+});
+export type Scene = z.infer<typeof sceneSchema>;
+
+export const sceneDetailSchema = sceneSchema.extend({
+  map: mapAssetSchema.nullable(),
+  /** URL firmato dell'immagine, valido per poco. */
+  mapSource: signedSourceSchema.nullable(),
+  tokens: z.array(tokenSchema),
+});
+export type SceneDetail = z.infer<typeof sceneDetailSchema>;
+
+export const createSceneInputSchema = z.object({
+  name: z.string().trim().min(1).max(120),
+  mapAssetId: uuidSchema.nullable().optional(),
+  /** Applica il rilevamento della mappa come proposta iniziale. */
+  applyDetection: z.boolean().default(true),
+});
+export type CreateSceneInput = z.infer<typeof createSceneInputSchema>;
+
+export const updateGridInputSchema = gridConfigurationSchema.partial().extend({
+  /** Versione della griglia letta dal client. */
+  version: entityVersionSchema,
+  /** Conferma esplicita del Game Master. */
+  confirmed: z.boolean().optional(),
+});
+export type UpdateGridInput = z.infer<typeof updateGridInputSchema>;
+
 /* --------------------------------- stato --------------------------------- */
 
 /** Esito del controllo di stato del servizio. */

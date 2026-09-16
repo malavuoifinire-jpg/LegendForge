@@ -6,6 +6,9 @@ import { healthRoutes } from './routes/health.js';
 import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { sessionRoutes } from './routes/session.js';
 import { campaignRoutes } from './routes/campaigns.js';
+import { mapRoutes } from './routes/maps.js';
+import { sceneRoutes } from './routes/scenes.js';
+import { tokenRoutes } from './routes/tokens.js';
 import type { ServerContext } from './context.js';
 import { ensureBucket, readStorageConfig, type BucketState } from './storage/supabase.js';
 import { SUPPORTED_MAP_MIME_TYPES } from '@legendforge/contracts';
@@ -60,7 +63,13 @@ export function createApp(env: ServerEnv, pool: DatabasePool | null): Router {
   // Le rotte che toccano i dati esistono solo se c'è un database configurato.
   if (pool) {
     const context: ServerContext = { env, pool };
-    routes.push(...sessionRoutes(context), ...campaignRoutes(context));
+    routes.push(
+      ...sessionRoutes(context),
+      ...campaignRoutes(context),
+      ...mapRoutes(context),
+      ...sceneRoutes(context),
+      ...tokenRoutes(context),
+    );
   }
 
   return createRouter(routes);
