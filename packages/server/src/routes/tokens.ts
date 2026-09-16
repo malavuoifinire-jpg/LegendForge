@@ -6,12 +6,17 @@ import {
   type Token,
   type TokenDisposition,
 } from '@legendforge/contracts';
-import { snapImagePointToFootprint, type GridConfiguration } from '@legendforge/core';
+import {
+  canTraverse,
+  snapImagePointToFootprint,
+  type GridConfiguration,
+} from '@legendforge/core';
 import { requireGameMaster, requireSceneAccess, requireTokenAccess } from '../access.js';
 import { requireViewer, type ServerContext } from '../context.js';
 import { emitSceneEvent, pruneSceneEvents } from '../events.js';
 import { HttpError, type Route } from '../http.js';
 import { parseBody } from '../validate.js';
+import { loadWalls, toWallSegment } from '../vision.js';
 
 /**
  * Quanto controllo ha chi guarda su una pedina.
@@ -146,6 +151,24 @@ function place(
   return snapImagePointToFootprint(point, grid, sizeInCells);
 }
 
+/**
+ * Se fra due posizioni c'è un muro che ferma il passo.
+ *
+ * Si guarda il tragitto del centro della pedina: è una semplificazione
+ * dichiarata — una creatura larga potrebbe sfiorare uno spigolo — e il Game
+ * Master può sempre autorizzare lo spostamento comunque.
+ */
+async function movementIsBlocked(
+  context: ServerContext,
+  sceneId: string,
+  from: { x: number; y: number },
+  to: { x: number; y: number },
+): Promise<boolean> {
+  const walls = await loadWalls(context, sceneId);
+  if (walls.length === 0) return false;
+  return !canTraverse(from, to, walls.map(toWallSegment));
+}
+
 export function tokenRoutes(context: ServerContext): Route[] {
   return [
     {
@@ -245,6 +268,26 @@ export function tokenRoutes(context: ServerContext): Route[] {
         const position = moved
           ? place(target, grid, sizeInCells, input.snapToGrid ?? true)
           : target;
+
+        // I muri fermano il movimento sul server, non solo nell'interfaccia:
+        // un client che li ignorasse verrebbe comunque rifiutato. Il Game
+        // Master resta l'autorità finale e passa sempre.
+        if (moved && access.role !== 'game_master') {
+          const blocked = await movementIsBlocked(
+            context,
+            access.sceneId,
+            { x: current.x, y: current.y },
+            position,
+          );
+          if (blocked) {
+            throw new HttpError(
+              422,
+              'movement_blocked',
+              'Il percorso è bloccato da un muro',
+              toToken(current),
+            );
+          }
+        }
 
         const { rows } = await context.pool.query<TokenRow>(
           `UPDATE tokens
