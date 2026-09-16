@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  calibrateFromTwoPoints,
   cellCenterToImagePoint,
   cellCornerToImagePoint,
   cellsToMeters,
@@ -128,5 +129,53 @@ describe('aggancio e impronta delle pedine', () => {
     const twice = snapImagePointToFootprint(once, grid, 3);
     expect(twice.x).toBeCloseTo(once.x, 9);
     expect(twice.y).toBeCloseTo(once.y, 9);
+  });
+});
+
+describe('calibrazione da due incroci', () => {
+  it('ricava il passo da due punti sulla stessa riga', () => {
+    const result = calibrateFromTwoPoints({ x: 20, y: 10 }, { x: 320, y: 10 }, 3);
+    expect(result).not.toBeNull();
+    expect(result!.cellSizePx).toBeCloseTo(100, 6);
+    expect(result!.rotationDeg).toBeCloseTo(0, 6);
+  });
+
+  it('colloca gli incroci indicati su incroci reali della griglia', () => {
+    const first = { x: 37, y: 61 };
+    const second = { x: 437, y: 61 };
+    const result = calibrateFromTwoPoints(first, second, 4)!;
+    const calibrated: GridConfiguration = {
+      ...result,
+      metersPerCell: 1.5,
+      snapEnabled: true,
+    };
+    for (const point of [first, second]) {
+      const cell = imagePointToCellVector(point, calibrated);
+      expect(Math.abs(cell.col - Math.round(cell.col))).toBeLessThan(1e-6);
+      expect(Math.abs(cell.row - Math.round(cell.row))).toBeLessThan(1e-6);
+    }
+  });
+
+  it('riconosce una lieve inclinazione', () => {
+    const angle = (3 * Math.PI) / 180;
+    const first = { x: 50, y: 50 };
+    const second = { x: 50 + 400 * Math.cos(angle), y: 50 + 400 * Math.sin(angle) };
+    const result = calibrateFromTwoPoints(first, second, 5)!;
+    expect(result.cellSizePx).toBeCloseTo(80, 4);
+    expect(result.rotationDeg).toBeCloseTo(3, 2);
+  });
+
+  it('riporta una inclinazione quasi verticale nel suo equivalente minimo', () => {
+    // Due incroci sulla stessa colonna: la griglia è dritta, non ruotata di 90°.
+    const result = calibrateFromTwoPoints({ x: 100, y: 20 }, { x: 100, y: 420 }, 4)!;
+    expect(result.cellSizePx).toBeCloseTo(100, 6);
+    expect(Math.abs(result.rotationDeg)).toBeLessThan(0.001);
+  });
+
+  it('rifiuta input privi di senso', () => {
+    expect(calibrateFromTwoPoints({ x: 0, y: 0 }, { x: 100, y: 0 }, 0)).toBeNull();
+    expect(calibrateFromTwoPoints({ x: 0, y: 0 }, { x: 0, y: 0 }, 3)).toBeNull();
+    // Due incroci troppo vicini per il numero di caselle dichiarato.
+    expect(calibrateFromTwoPoints({ x: 0, y: 0 }, { x: 10, y: 0 }, 50)).toBeNull();
   });
 });

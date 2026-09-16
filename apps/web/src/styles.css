@@ -724,3 +724,120 @@ button {
     min-height: 60vh;
   }
 }
+
+/* --------------------------- calibrazione e scena ------------------------- */
+
+.chip {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-radius: 999px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.chip--confirmed {
+  color: var(--good);
+  border-color: rgba(74, 222, 128, 0.5);
+}
+
+.chip--suggested {
+  color: var(--warn);
+  border-color: rgba(251, 191, 36, 0.5);
+}
+
+.wizard {
+  margin: 12px 0;
+  padding: 11px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+}
+
+.wizard h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wizard__actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.panel__wide {
+  width: 100%;
+  margin-top: 12px;
+}
+
+.panel__action--danger {
+  color: var(--bad);
+}
+
+.panel__action--danger:hover {
+  border-color: var(--bad);
+}
+
+.token__flag {
+  margin-left: 6px;
+  font-size: 10px;
+  color: var(--warn);
+  border: 1px solid rgba(251, 191, 36, 0.4);
+  border-radius: 999px;
+  padding: 1px 6px;
+}
+
+.screen__back {
+  width: auto;
+  margin: 0 0 6px;
+  text-align: left;
+}
+
+.scene-canvas__picking {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(251, 191, 36, 0.14);
+  border: 1px solid rgba(251, 191, 36, 0.5);
+  color: var(--warn);
+  border-radius: 999px;
+  padding: 5px 14px;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.field select {
+  width: 100%;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  color: var(--text);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.field input[type='file'] {
+  width: 100%;
+  background: var(--bg);
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-family: inherit;
+}
+
+.field input[type='file']::file-selector-button {
+  background: var(--surface-2);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px 11px;
+  margin-right: 10px;
+  cursor: pointer;
+  font-family: inherit;
+}

@@ -9,7 +9,7 @@ import {
   type Viewport,
 } from '@legendforge/core';
 import { SceneCanvas } from './SceneCanvas';
-import type { DemoToken } from './types';
+import type { CanvasMap, CanvasToken } from './types';
 import {
   createDemoMap,
   DEMO_MAP_CELL_PX,
@@ -28,7 +28,7 @@ const INITIAL_GRID: GridConfiguration = {
   snapEnabled: DEFAULT_RULE_SET.grid.defaultSnapEnabled,
 };
 
-const INITIAL_TOKENS: DemoToken[] = [
+const INITIAL_TOKENS: CanvasToken[] = [
   { id: 'a', name: 'Aria', x: 32 + 4.5 * 64, y: 18 + 4.5 * 64, sizeInCells: 1, color: '#4ade80' },
   { id: 'b', name: 'Bork', x: 32 + 6.5 * 64, y: 18 + 3.5 * 64, sizeInCells: 1, color: '#60a5fa' },
   { id: 'o', name: 'Ogre', x: 32 + 17 * 64, y: 18 + 12 * 64, sizeInCells: 2, color: '#f87171' },
@@ -42,16 +42,17 @@ const INITIAL_TOKENS: DemoToken[] = [
  * con mappe reali e persistenza viene costruito.
  */
 export function TablePreview() {
-  const [map, setMap] = useState<HTMLCanvasElement | null>(null);
+  const [map, setMap] = useState<CanvasMap | null>(null);
   const [grid, setGrid] = useState<GridConfiguration>(INITIAL_GRID);
   const [gridVisible, setGridVisible] = useState(true);
-  const [tokens, setTokens] = useState<DemoToken[]>(INITIAL_TOKENS);
+  const [tokens, setTokens] = useState<CanvasToken[]>(INITIAL_TOKENS);
   const [selectedTokenId, setSelectedTokenId] = useState<string | null>(null);
   const [viewport, setViewport] = useState<Viewport>({ panX: 0, panY: 0, zoom: 1 });
   const [hoverCell, setHoverCell] = useState<CellCoord | null>(null);
 
   useEffect(() => {
-    setMap(createDemoMap());
+    const canvas = createDemoMap();
+    setMap({ source: canvas, width: canvas.width, height: canvas.height });
   }, []);
 
   const updateGrid = useCallback((patch: Partial<GridConfiguration>) => {

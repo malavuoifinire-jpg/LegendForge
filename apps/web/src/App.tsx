@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Campaign, SessionState, Viewer } from '@legendforge/contracts';
+import type { Campaign, Scene, SessionState, Viewer } from '@legendforge/contracts';
 import { ApiError, api } from './api/client';
 import { AuthScreen } from './auth/AuthScreen';
 import { CampaignsScreen } from './campaigns/CampaignsScreen';
 import { CampaignScreen } from './campaigns/CampaignScreen';
+import { SceneView } from './scene/SceneView';
 import { StatusPanel } from './panels/StatusPanel';
 
 type Boot =
@@ -15,6 +16,7 @@ export function App() {
   const [boot, setBoot] = useState<Boot>({ phase: 'loading' });
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [scene, setScene] = useState<Scene | null>(null);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -40,6 +42,7 @@ export function App() {
     await api.logout().catch(() => undefined);
     setViewer(null);
     setCampaign(null);
+    setScene(null);
     await load();
   }, [load]);
 
@@ -95,8 +98,18 @@ export function App() {
       )}
 
       <main className="app__main">
-        {campaign ? (
-          <CampaignScreen campaign={campaign} onBack={() => setCampaign(null)} />
+        {scene && campaign ? (
+          <SceneView
+            sceneId={scene.id}
+            canEdit={campaign.viewerRole === 'game_master'}
+            onBack={() => setScene(null)}
+          />
+        ) : campaign ? (
+          <CampaignScreen
+            campaign={campaign}
+            onBack={() => setCampaign(null)}
+            onOpenScene={setScene}
+          />
         ) : (
           <CampaignsScreen onOpen={setCampaign} />
         )}

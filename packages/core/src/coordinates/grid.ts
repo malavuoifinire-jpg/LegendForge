@@ -155,3 +155,61 @@ export function formatDistance(
   const roundedCells = Number(metersToCells(meters, grid).toFixed(precision));
   return { meters: roundedMeters, cells: roundedCells, label: `${roundedMeters} m (${roundedCells} caselle)` };
 }
+
+/* ------------------------- calibrazione manuale --------------------------- */
+
+export interface TwoPointCalibration {
+  cellSizePx: number;
+  offsetX: number;
+  offsetY: number;
+  rotationDeg: number;
+}
+
+/**
+ * Ricava passo, offset e rotazione da due incroci noti della griglia.
+ *
+ * È la via di uscita quando il rilevamento automatico sbaglia: il Game Master
+ * indica due incroci e quante caselle li separano, e da lì si ricostruisce
+ * l'intera trasformazione. I due punti devono stare sulla stessa riga o sulla
+ * stessa colonna, altrimenti un solo numero non basta a determinare il passo.
+ *
+ * L'angolo viene riportato nell'intervallo (-45, 45] e poi limitato alla
+ * rotazione massima ammessa: una griglia quadrata è indistinguibile da se
+ * stessa ogni 90 gradi, quindi un'inclinazione di 89 gradi è in realtà -1.
+ */
+export function calibrateFromTwoPoints(
+  first: ImagePoint,
+  second: ImagePoint,
+  cellsBetween: number,
+): TwoPointCalibration | null {
+  if (!Number.isFinite(cellsBetween) || cellsBetween <= 0) return null;
+  const dx = second.x - first.x;
+  const dy = second.y - first.y;
+  const distance = Math.hypot(dx, dy);
+  if (distance < 1) return null;
+
+  const cellSizePx = distance / cellsBetween;
+  if (cellSizePx < MIN_CELL_SIZE_PX) return null;
+
+  let angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+  angle = ((angle % 90) + 135) % 90 - 45;
+  const rotationDeg = normalizeRotationDeg(angle);
+
+  const rad = (rotationDeg * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  const wrap = (value: number): number => {
+    const wrapped = value % cellSizePx;
+    return wrapped < 0 ? wrapped + cellSizePx : wrapped;
+  };
+  // L'origine è il primo incrocio riportato nella cella (0,0).
+  const u = wrap(first.x * cos + first.y * sin);
+  const v = wrap(-first.x * sin + first.y * cos);
+
+  return {
+    cellSizePx: Number(cellSizePx.toFixed(4)),
+    offsetX: Number((u * cos - v * sin).toFixed(4)),
+    offsetY: Number((u * sin + v * cos).toFixed(4)),
+    rotationDeg: Number(rotationDeg.toFixed(3)),
+  };
+}

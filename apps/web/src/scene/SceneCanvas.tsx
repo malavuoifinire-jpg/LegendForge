@@ -14,18 +14,28 @@ import {
   type ImagePoint,
   type Viewport,
 } from '@legendforge/core';
-import type { DemoToken } from './types';
+import type { CanvasMap, CanvasToken } from './types';
 
 interface SceneCanvasProps {
-  map: HTMLCanvasElement | null;
+  map: CanvasMap | null;
   grid: GridConfiguration;
   gridVisible: boolean;
-  tokens: DemoToken[];
+  tokens: CanvasToken[];
   selectedTokenId: string | null;
   onSelectToken: (id: string | null) => void;
   onMoveToken: (id: string, position: ImagePoint) => void;
   onViewportChange?: (viewport: Viewport) => void;
   onHoverCell?: (cell: CellCoord | null) => void;
+  /** Chiamata quando il trascinamento finisce: è il momento di salvare. */
+  onCommitToken?: (id: string) => void;
+  /**
+   * Modalità di raccolta punti per la calibrazione: il clic indica un incrocio
+   * invece di selezionare una pedina.
+   */
+  picking?: boolean;
+  onPickPoint?: (point: ImagePoint) => void;
+  /** Punti già raccolti, disegnati come riferimento. */
+  pickedPoints?: ImagePoint[];
 }
 
 type Interaction =
@@ -46,6 +56,10 @@ export function SceneCanvas({
   onMoveToken,
   onViewportChange,
   onHoverCell,
+  onCommitToken,
+  picking = false,
+  onPickPoint,
+  pickedPoints,
 }: SceneCanvasProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -108,7 +122,13 @@ export function SceneCanvas({
     // Mappa
     const origin = imageToScreen({ x: 0, y: 0 }, viewport);
     ctx.imageSmoothingEnabled = viewport.zoom < 2;
-    ctx.drawImage(map, origin.x, origin.y, map.width * viewport.zoom, map.height * viewport.zoom);
+    ctx.drawImage(
+      map.source,
+      origin.x,
+      origin.y,
+      map.width * viewport.zoom,
+      map.height * viewport.zoom,
+    );
 
     // Bordo della mappa, per rendere visibile dove finisce
     ctx.strokeStyle = 'rgba(126, 231, 255, 0.28)';
@@ -127,12 +147,17 @@ export function SceneCanvas({
     for (const token of tokens) {
       drawToken(ctx, token, grid, viewport, token.id === selectedTokenId);
     }
-  }, [map, grid, gridVisible, tokens, selectedTokenId, viewport, size]);
+
+    // Punti raccolti per la calibrazione
+    for (const [index, point] of (pickedPoints ?? []).entries()) {
+      drawPickedPoint(ctx, point, viewport, index + 1);
+    }
+  }, [map, grid, gridVisible, tokens, selectedTokenId, viewport, size, pickedPoints]);
 
   /* ------------------------------ interazione ------------------------------ */
 
   const tokenAtPoint = useCallback(
-    (point: ImagePoint): DemoToken | null => {
+    (point: ImagePoint): CanvasToken | null => {
       for (let i = tokens.length - 1; i >= 0; i -= 1) {
         const token = tokens[i];
         if (!token) continue;
@@ -152,6 +177,12 @@ export function SceneCanvas({
       const rect = canvas.getBoundingClientRect();
       const screen = { x: event.clientX - rect.left, y: event.clientY - rect.top };
       const image = screenToImage(screen, viewport);
+
+      if (picking && event.button === 0) {
+        onPickPoint?.(image);
+        return;
+      }
+
       const token = tokenAtPoint(image);
 
       if (token && event.button === 0) {
@@ -168,7 +199,7 @@ export function SceneCanvas({
       if (event.button === 0) onSelectToken(null);
       interactionRef.current = { kind: 'pan', lastX: event.clientX, lastY: event.clientY };
     },
-    [viewport, tokenAtPoint, onSelectToken],
+    [viewport, tokenAtPoint, onSelectToken, picking, onPickPoint],
   );
 
   const handlePointerMove = useCallback(
@@ -206,15 +237,20 @@ export function SceneCanvas({
       const interaction = interactionRef.current;
       interactionRef.current = { kind: 'none' };
 
-      if (interaction.kind !== 'token' || !grid.snapEnabled) return;
+      if (interaction.kind !== 'token') return;
       const token = tokens.find((candidate) => candidate.id === interaction.id);
       if (!token) return;
-      onMoveToken(
-        token.id,
-        snapImagePointToFootprint({ x: token.x, y: token.y }, grid, token.sizeInCells),
-      );
+
+      if (grid.snapEnabled) {
+        onMoveToken(
+          token.id,
+          snapImagePointToFootprint({ x: token.x, y: token.y }, grid, token.sizeInCells),
+        );
+      }
+      // Il salvataggio avviene a fine gesto, non a ogni pixel percorso.
+      onCommitToken?.(token.id);
     },
-    [grid, tokens, onMoveToken],
+    [grid, tokens, onMoveToken, onCommitToken],
   );
 
   // Lo zoom con la rotella richiede un listener non passivo: React registra
@@ -247,6 +283,7 @@ export function SceneCanvas({
       <button type="button" className="scene-canvas__fit" onClick={fit}>
         Inquadra la mappa
       </button>
+      {picking && <div className="scene-canvas__picking">Clicca un incrocio della griglia</div>}
     </div>
   );
 }
@@ -322,9 +359,36 @@ function drawGrid(
   ctx.restore();
 }
 
+function drawPickedPoint(
+  ctx: CanvasRenderingContext2D,
+  point: ImagePoint,
+  viewport: Viewport,
+  index: number,
+): void {
+  const screen = imageToScreen(point, viewport);
+  ctx.save();
+  ctx.strokeStyle = '#fbbf24';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(screen.x - 9, screen.y);
+  ctx.lineTo(screen.x + 9, screen.y);
+  ctx.moveTo(screen.x, screen.y - 9);
+  ctx.lineTo(screen.x, screen.y + 9);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.arc(screen.x, screen.y, 13, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.fillStyle = '#fbbf24';
+  ctx.font = '600 11px ui-monospace, monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(String(index), screen.x + 16, screen.y - 8);
+  ctx.restore();
+}
+
 function drawToken(
   ctx: CanvasRenderingContext2D,
-  token: DemoToken,
+  token: CanvasToken,
   grid: GridConfiguration,
   viewport: Viewport,
   selected: boolean,
@@ -334,6 +398,7 @@ function drawToken(
   if (radius < 1) return;
 
   ctx.save();
+  if (token.hidden) ctx.globalAlpha = 0.55;
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius * 0.94, 0, Math.PI * 2);
   ctx.fillStyle = token.color;
@@ -341,7 +406,9 @@ function drawToken(
 
   ctx.lineWidth = Math.max(1.5, radius * 0.08);
   ctx.strokeStyle = selected ? '#f8fafc' : 'rgba(0,0,0,0.65)';
+  if (token.hidden) ctx.setLineDash([5, 4]);
   ctx.stroke();
+  ctx.setLineDash([]);
 
   if (selected) {
     ctx.beginPath();
