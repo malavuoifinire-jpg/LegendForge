@@ -107,21 +107,21 @@ export async function ensureBucket(
   maxUploadBytes: number,
   allowedMimeTypes: readonly string[],
 ): Promise<BucketState> {
-  try {
-    const existing = await call(config, `/bucket/${encodeURIComponent(config.bucket)}`);
-    if (existing.ok) {
-      const body = (await existing.json()) as { public?: boolean };
-      return { exists: true, created: false, public: body.public ?? null, error: null };
-    }
-    if (existing.status !== 404) {
-      return {
-        exists: false,
-        created: false,
-        public: null,
-        error: await readError(existing, `HTTP ${existing.status}`),
-      };
-    }
+  const describe = async (): Promise<BucketState | null> => {
+    const response = await call(config, `/bucket/${encodeURIComponent(config.bucket)}`);
+    if (!response.ok) return null;
+    const body = (await response.json()) as { public?: boolean };
+    return { exists: true, created: false, public: body.public ?? null, error: null };
+  };
 
+  try {
+    const existing = await describe();
+    if (existing) return existing;
+
+    // Lo storage segnala un bucket assente con codici diversi a seconda della
+    // versione — 404 oppure 400 con "Bucket not found" nel corpo. Invece di
+    // indovinare quale, si prova a crearlo: se c'era gia, il servizio lo dice
+    // e lo rileggiamo.
     const created = await call(config, '/bucket', {
       method: 'POST',
       body: JSON.stringify({
@@ -132,15 +132,15 @@ export async function ensureBucket(
         allowed_mime_types: [...allowedMimeTypes],
       }),
     });
-    if (!created.ok) {
-      return {
-        exists: false,
-        created: false,
-        public: null,
-        error: await readError(created, `HTTP ${created.status}`),
-      };
+
+    if (created.ok) return { exists: true, created: true, public: false, error: null };
+
+    const message = await readError(created, `HTTP ${created.status}`);
+    if (created.status === 409 || /already exists|duplicate/iu.test(message)) {
+      const after = await describe();
+      if (after) return after;
     }
-    return { exists: true, created: true, public: false, error: null };
+    return { exists: false, created: false, public: null, error: message };
   } catch (error) {
     return {
       exists: false,
