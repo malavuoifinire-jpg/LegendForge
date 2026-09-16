@@ -5,6 +5,7 @@ import {
   type GridState,
   type Scene,
   type SceneDetail,
+  type SceneEvents,
   type Token,
 } from '@legendforge/contracts';
 import { DEFAULT_RULE_SET } from '@legendforge/core';
@@ -12,6 +13,14 @@ import { requireCampaignAccess, requireGameMaster, requireSceneAccess } from '..
 import { requireViewer, type ServerContext } from '../context.js';
 import { HttpError, type Route } from '../http.js';
 import { createSignedDownload, readStorageConfig } from '../storage/supabase.js';
+import {
+  emitSceneEvent,
+  latestCursor,
+  pruneSceneEvents,
+  readSceneEvents,
+  type EventVisibility,
+} from '../events.js';
+import { controlLevel } from './tokens.js';
 import { parseBody } from '../validate.js';
 import { SELECT_MAPS, SOURCE_URL_SECONDS, toMapAsset } from './maps.js';
 import { toToken, type TokenRow } from './tokens.js';
@@ -215,7 +224,23 @@ export function sceneRoutes(context: ServerContext): Route[] {
           }
         }
 
-        const body: SceneDetail = { ...toScene(scene), map, mapSource, tokens };
+        // Quali pedine chi guarda può effettivamente muovere: lo dice il
+        // server, così l'interfaccia non deve indovinarlo.
+        const controllableTokenIds: string[] = [];
+        for (const token of tokens) {
+          const level = await controlLevel(context, viewer.id, access.role, token.actorId);
+          if (level !== 'none') controllableTokenIds.push(token.id);
+        }
+
+        const body: SceneDetail = {
+          ...toScene(scene),
+          map,
+          mapSource,
+          tokens,
+          eventCursor: await latestCursor(context.pool, access.sceneId),
+          viewerRole: access.role,
+          controllableTokenIds,
+        };
         return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
       },
     },
@@ -273,8 +298,53 @@ export function sceneRoutes(context: ServerContext): Route[] {
         ]);
         const row = updated.rows[0];
         if (!row) throw new Error('scena non leggibile dopo l aggiornamento');
-        return { status: 200, headers: { 'Cache-Control': 'no-store' }, body: toGridState(row) };
+        const gridState = toGridState(row);
+        await emitSceneEvent(context.pool, access.sceneId, 'grid.updated', gridState, 'all');
+        void pruneSceneEvents(context.pool, access.sceneId);
+        return { status: 200, headers: { 'Cache-Control': 'no-store' }, body: gridState };
+      },
+    },
+    {
+      /**
+       * Attesa lunga: la richiesta resta aperta finché non succede qualcosa,
+       * fino a un tetto oltre il quale il client riprova. Gli aggiornamenti
+       * passano dalla stessa autorizzazione della lettura completa, quindi
+       * esiste un solo posto in cui si decide che cosa una persona può vedere.
+       */
+      method: 'GET',
+      pattern: '/api/scenes/:sceneId/events',
+      async handle({ request, params }) {
+        const viewer = await requireViewer(context, request);
+        const access = await requireSceneAccess(context, viewer, params.sceneId ?? '');
+        const since = Number.parseInt(request.query.since ?? '0', 10);
+        const cursor = Number.isFinite(since) && since >= 0 ? since : 0;
+        const visibilities: EventVisibility[] =
+          access.role === 'game_master' ? ['all', 'game_master'] : ['all'];
+        const wait = request.query.wait !== '0';
+
+        const deadline = Date.now() + (wait ? HOLD_MS : 0);
+        for (;;) {
+          const events = await readSceneEvents(context.pool, access.sceneId, cursor, visibilities);
+          if (events.length > 0) {
+            const last = events[events.length - 1];
+            const body: SceneEvents = { cursor: last ? last.id : cursor, events };
+            return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
+          }
+          if (Date.now() >= deadline) {
+            const body: SceneEvents = { cursor, events: [] };
+            return { status: 200, headers: { 'Cache-Control': 'no-store' }, body };
+          }
+          await sleep(POLL_INTERVAL_MS);
+        }
       },
     },
   ];
+}
+
+/** Quanto a lungo la richiesta resta in attesa prima di tornare a mani vuote. */
+const HOLD_MS = 20_000;
+const POLL_INTERVAL_MS = 350;
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

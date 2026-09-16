@@ -206,4 +206,64 @@ ALTER TABLE actors               ENABLE ROW LEVEL SECURITY;
 ALTER TABLE tokens               ENABLE ROW LEVEL SECURITY;
 `;
 
-export const MIGRATIONS: Migration[] = [{ name: '0001_init', sql: INIT }];
+const INVITES_AND_PLAYERS = `
+-- Il nome visualizzato identifica una persona al momento dell'accesso, quindi
+-- non può essere ambiguo. Il confronto è senza distinzione di maiuscole.
+CREATE UNIQUE INDEX users_display_name_unique ON users (lower(display_name));
+
+CREATE TABLE invites (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id  uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  token_hash   text NOT NULL UNIQUE,
+  label        text NOT NULL DEFAULT '',
+  max_uses     integer NOT NULL DEFAULT 1 CHECK (max_uses BETWEEN 1 AND 8),
+  used_count   integer NOT NULL DEFAULT 0 CHECK (used_count >= 0),
+  expires_at   timestamptz,
+  revoked_at   timestamptz,
+  created_by   uuid REFERENCES users(id) ON DELETE SET NULL,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  version      integer NOT NULL DEFAULT 1,
+  CHECK (used_count <= max_uses)
+);
+CREATE INDEX invites_campaign_idx ON invites (campaign_id) WHERE revoked_at IS NULL;
+
+-- Quali persone controllano quale personaggio.
+CREATE TABLE actor_ownership (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_id    uuid NOT NULL REFERENCES actors(id) ON DELETE CASCADE,
+  user_id     uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  version     integer NOT NULL DEFAULT 1,
+  UNIQUE (actor_id, user_id)
+);
+CREATE INDEX actor_ownership_user_idx ON actor_ownership (user_id);
+
+-- Colore della pedina predefinita di un attore, usato quando se ne crea una.
+ALTER TABLE actors ADD COLUMN color text NOT NULL DEFAULT '#60a5fa'
+  CHECK (color ~* '^#[0-9a-f]{6}$');
+
+-- Registro append-only dei cambiamenti di scena: è la base della
+-- sincronizzazione. Ogni evento nasce già con la sua visibilità, così il
+-- filtro per ruolo è un dato e non una decisione presa al momento della
+-- consegna.
+CREATE TABLE scene_events (
+  id          bigserial PRIMARY KEY,
+  scene_id    uuid NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  kind        text NOT NULL,
+  payload     jsonb NOT NULL,
+  visibility  text NOT NULL DEFAULT 'all' CHECK (visibility IN ('all', 'game_master')),
+  created_at  timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX scene_events_scene_idx ON scene_events (scene_id, id);
+
+ALTER TABLE invites        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE actor_ownership ENABLE ROW LEVEL SECURITY;
+ALTER TABLE scene_events   ENABLE ROW LEVEL SECURITY;
+`;
+
+export const MIGRATIONS: Migration[] = [
+  { name: '0001_init', sql: INIT },
+  { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
+];

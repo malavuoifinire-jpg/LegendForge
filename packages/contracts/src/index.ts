@@ -122,7 +122,14 @@ export const setupResultSchema = z.object({
 });
 export type SetupResult = z.infer<typeof setupResultSchema>;
 
-export const loginInputSchema = z.object({ pin: z.string().min(1).max(PIN_MAX_LENGTH) });
+export const loginInputSchema = z.object({
+  /**
+   * Nome visualizzato. Assente significa il proprietario dell'istanza: è la
+   * scorciatoia per chi ha configurato il servizio e non ha un invito.
+   */
+  displayName: z.string().trim().min(1).max(80).optional(),
+  pin: z.string().min(1).max(PIN_MAX_LENGTH),
+});
 export type LoginInput = z.infer<typeof loginInputSchema>;
 
 export const recoverInputSchema = z.object({
@@ -130,6 +137,93 @@ export const recoverInputSchema = z.object({
   newPin: pinSchema,
 });
 export type RecoverInput = z.infer<typeof recoverInputSchema>;
+
+/* --------------------------------- inviti -------------------------------- */
+
+export const createInviteInputSchema = z.object({
+  label: z.string().trim().max(80).default(''),
+  maxUses: z.number().int().min(1).max(8).default(1),
+  /** Durata in ore; assente significa senza scadenza. */
+  expiresInHours: z.number().int().min(1).max(24 * 30).nullable().default(72),
+});
+export type CreateInviteInput = z.infer<typeof createInviteInputSchema>;
+
+export const inviteSchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  label: z.string(),
+  maxUses: z.number().int(),
+  usedCount: z.number().int(),
+  expiresAt: isoDateSchema.nullable(),
+  revokedAt: isoDateSchema.nullable(),
+  /** Stato calcolato: comodo da mostrare, ma deciso dal server. */
+  status: z.enum(['active', 'exhausted', 'expired', 'revoked']),
+});
+export type Invite = z.infer<typeof inviteSchema>;
+
+/** Restituito una sola volta, alla creazione: il segreto non è più recuperabile. */
+export const createdInviteSchema = inviteSchema.extend({
+  /** Percorso da comporre con l'indirizzo del sito. */
+  joinPath: z.string(),
+  token: z.string(),
+});
+export type CreatedInvite = z.infer<typeof createdInviteSchema>;
+
+/** Anteprima mostrata a chi apre un link d'invito. */
+export const invitePreviewSchema = z.object({
+  valid: z.boolean(),
+  reason: z.enum(['ok', 'not_found', 'revoked', 'expired', 'exhausted', 'full']),
+  campaignName: z.string().nullable(),
+  seatsLeft: z.number().int().nonnegative().nullable(),
+});
+export type InvitePreview = z.infer<typeof invitePreviewSchema>;
+
+export const acceptInviteInputSchema = z.object({
+  displayName: z.string().trim().min(1).max(80),
+  pin: pinSchema,
+});
+export type AcceptInviteInput = z.infer<typeof acceptInviteInputSchema>;
+
+/* -------------------------------- membri --------------------------------- */
+
+export const campaignMemberSchema = z.object({
+  userId: uuidSchema,
+  displayName: z.string(),
+  role: z.enum(['game_master', 'player']),
+  status: z.enum(['active', 'suspended']),
+  joinedAt: isoDateSchema,
+  /** Identificatori dei personaggi che questa persona controlla. */
+  actorIds: z.array(uuidSchema),
+});
+export type CampaignMember = z.infer<typeof campaignMemberSchema>;
+
+/* -------------------------------- attori --------------------------------- */
+
+export const actorKindSchema = z.enum(['character', 'monster']);
+export type ActorKind = z.infer<typeof actorKindSchema>;
+
+export const actorSchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  kind: actorKindSchema,
+  name: z.string(),
+  sizeInCells: z.number().positive().max(20),
+  color: hexColorSchema,
+  /** Chi lo controlla. Vuoto significa: solo il Game Master. */
+  ownerUserIds: z.array(uuidSchema),
+});
+export type Actor = z.infer<typeof actorSchema>;
+
+export const createActorInputSchema = z.object({
+  name: z.string().trim().min(1).max(160),
+  kind: actorKindSchema.default('character'),
+  sizeInCells: z.number().positive().max(20).default(1),
+  color: hexColorSchema.default('#60a5fa'),
+});
+export type CreateActorInput = z.infer<typeof createActorInputSchema>;
+
+export const setActorOwnersInputSchema = z.object({
+  userIds: z.array(uuidSchema).max(8),
+});
+export type SetActorOwnersInput = z.infer<typeof setActorOwnersInputSchema>;
 
 /* -------------------------------- campagne ------------------------------- */
 
@@ -256,6 +350,8 @@ export type Token = z.infer<typeof tokenSchema>;
 
 export const createTokenInputSchema = z.object({
   name: z.string().trim().min(1).max(120),
+  /** Personaggio o mostro rappresentato: decide chi può muovere la pedina. */
+  actorId: uuidSchema.nullable().optional(),
   x: finiteNumber,
   y: finiteNumber,
   sizeInCells: z.number().positive().max(20).default(1),
@@ -291,11 +387,32 @@ export const sceneSchema = entityMetaSchema.extend({
 });
 export type Scene = z.infer<typeof sceneSchema>;
 
+export const sceneEventSchema = z.object({
+  id: z.number().int().nonnegative(),
+  kind: z.enum(['token.upserted', 'token.removed', 'grid.updated']),
+  payload: z.unknown(),
+  at: isoDateSchema,
+});
+export type SceneEvent = z.infer<typeof sceneEventSchema>;
+
+export const sceneEventsSchema = z.object({
+  /** Ultimo evento consegnato: va rimandato alla richiesta successiva. */
+  cursor: z.number().int().nonnegative(),
+  events: z.array(sceneEventSchema),
+});
+export type SceneEvents = z.infer<typeof sceneEventsSchema>;
+
 export const sceneDetailSchema = sceneSchema.extend({
   map: mapAssetSchema.nullable(),
   /** URL firmato dell'immagine, valido per poco. */
   mapSource: signedSourceSchema.nullable(),
   tokens: z.array(tokenSchema),
+  /** Punto di partenza per seguire gli aggiornamenti della scena. */
+  eventCursor: z.number().int().nonnegative(),
+  /** Ruolo di chi guarda, dentro questa campagna. */
+  viewerRole: campaignRoleSchema,
+  /** Pedine che chi guarda può muovere. */
+  controllableTokenIds: z.array(uuidSchema),
 });
 export type SceneDetail = z.infer<typeof sceneDetailSchema>;
 

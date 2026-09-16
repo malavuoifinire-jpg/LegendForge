@@ -79,7 +79,7 @@ export function sessionRoutes(context: ServerContext): Route[] {
       pattern: '/api/session',
       async handle({ request }) {
         const input = parseBody(loginInputSchema, request.body);
-        const attempt = await verifyPin(context.pool, input.pin);
+        const attempt = await verifyPin(context.pool, input.pin, input.displayName);
 
         if (!attempt.ok) {
           if (attempt.lockedForSeconds) {
@@ -89,13 +89,13 @@ export function sessionRoutes(context: ServerContext): Route[] {
               `Troppi tentativi. Riprova fra ${attempt.lockedForSeconds} secondi.`,
             );
           }
-          // Stesso messaggio sia per PIN sbagliato sia per istanza non
-          // rivendicata: non diciamo a un estraneo quale dei due è.
-          throw new HttpError(401, 'invalid_credentials', 'PIN non valido');
+          // Stesso messaggio per nome inesistente, PIN sbagliato e istanza non
+          // rivendicata: chi prova non deve poter dedurre quale dei tre è.
+          throw new HttpError(401, 'invalid_credentials', 'Nome o PIN non validi');
         }
 
         const userId = attempt.userId;
-        if (!userId) throw new HttpError(401, 'invalid_credentials', 'PIN non valido');
+        if (!userId) throw new HttpError(401, 'invalid_credentials', 'Nome o PIN non validi');
         const token = await createSession(context.pool, userId, request.headers['user-agent']);
         const viewer = await resolveViewer(context, {
           ...request,

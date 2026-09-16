@@ -25,6 +25,28 @@ export async function isInstanceClaimed(pool: DatabasePool): Promise<boolean> {
   return rows[0]?.claimed ?? false;
 }
 
+const SELECT_USER = `
+  SELECT id, display_name, pin_hash, recovery_code_hash, failed_attempts, locked_until
+    FROM users`;
+
+/**
+ * Trova la persona che sta tentando di entrare.
+ *
+ * Senza nome si intende il proprietario dell'istanza: è la scorciatoia per chi
+ * ha configurato il servizio e non è arrivato da un invito.
+ */
+export async function findUserForLogin(
+  pool: DatabasePool,
+  displayName?: string,
+): Promise<UserRow | null> {
+  if (!displayName) return getOwner(pool);
+  const { rows } = await pool.query<UserRow>(
+    `${SELECT_USER} WHERE lower(display_name) = lower($1)`,
+    [displayName],
+  );
+  return rows[0] ?? null;
+}
+
 export async function getOwner(pool: DatabasePool): Promise<UserRow | null> {
   const { rows } = await pool.query<UserRow>(
     `SELECT u.id, u.display_name, u.pin_hash, u.recovery_code_hash,
@@ -121,8 +143,14 @@ function lockoutSeconds(failedAttempts: number): number {
  * Il blocco è legato all'account, non all'indirizzo di rete: cambiare rete non
  * lo aggira. Il ritardo cresce a ogni tentativo fallito oltre la soglia.
  */
-export async function verifyPin(pool: DatabasePool, pin: string): Promise<AuthAttempt> {
-  const user = await getOwner(pool);
+export async function verifyPin(
+  pool: DatabasePool,
+  pin: string,
+  displayName?: string,
+): Promise<AuthAttempt> {
+  const user = await findUserForLogin(pool, displayName);
+  // Nome inesistente e PIN sbagliato danno la stessa risposta: chi prova non
+  // deve poter dedurre quali nomi esistono.
   if (!user) return { ok: false };
 
   if (user.locked_until) {

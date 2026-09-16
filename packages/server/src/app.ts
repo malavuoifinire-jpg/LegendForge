@@ -9,6 +9,8 @@ import { campaignRoutes } from './routes/campaigns.js';
 import { mapRoutes } from './routes/maps.js';
 import { sceneRoutes } from './routes/scenes.js';
 import { tokenRoutes } from './routes/tokens.js';
+import { inviteRoutes } from './routes/invites.js';
+import { actorRoutes } from './routes/actors.js';
 import type { ServerContext } from './context.js';
 import { ensureBucket, readStorageConfig, type BucketState } from './storage/supabase.js';
 import { SUPPORTED_MAP_MIME_TYPES } from '@legendforge/contracts';
@@ -69,6 +71,8 @@ export function createApp(env: ServerEnv, pool: DatabasePool | null): Router {
       ...mapRoutes(context),
       ...sceneRoutes(context),
       ...tokenRoutes(context),
+      ...inviteRoutes(context),
+      ...actorRoutes(context),
     );
   }
 

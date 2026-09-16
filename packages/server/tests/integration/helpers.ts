@@ -38,8 +38,9 @@ export async function createHarness(): Promise<TestHarness> {
       // svuota insieme alle altre: la riga singola va ricreata, altrimenti i
       // test partirebbero da uno stato che in produzione non esiste.
       await pool.query(`
-        TRUNCATE tokens, actors, grid_configurations, scenes, map_assets, assets,
-                 campaign_memberships, campaigns, sessions, instance_state, users
+        TRUNCATE scene_events, tokens, actor_ownership, actors, grid_configurations,
+                 scenes, map_assets, assets, invites, campaign_memberships, campaigns,
+                 sessions, instance_state, users
         RESTART IDENTITY CASCADE`);
       await pool.query('INSERT INTO instance_state (id) VALUES (true) ON CONFLICT DO NOTHING');
     },
