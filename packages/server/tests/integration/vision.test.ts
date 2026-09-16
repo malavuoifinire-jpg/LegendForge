@@ -141,12 +141,16 @@ async function addCharacter(
   return token.body as Token;
 }
 
-async function addMonster(sceneId: string, position: { x: number; y: number }): Promise<Token> {
+async function addMonster(
+  sceneId: string,
+  position: { x: number; y: number },
+  name = 'Ghoul',
+): Promise<Token> {
   const response = await harness.app.handle(
     request('POST', `/api/scenes/${sceneId}/tokens`, {
       cookie: gmCookie,
       body: {
-        name: 'Ghoul',
+        name,
         x: position.x,
         y: position.y,
         disposition: 'hostile',
@@ -301,8 +305,8 @@ describe('le pedine fuori dal campo visivo non vengono spedite', () => {
     const player = await addPlayer();
     await addCharacter(scene.id, player.userId, { x: 100, y: 300 });
     await addWalls(scene.id, [{ ax: 300, ay: 0, bx: 300, by: 600 }]);
-    const nascosto = await addMonster(scene.id, { x: 400, y: 300 });
-    const inVista = await addMonster(scene.id, { x: 200, y: 300 });
+    const nascosto = await addMonster(scene.id, { x: 400, y: 300 }, 'Ghoul nascosto');
+    const inVista = await addMonster(scene.id, { x: 200, y: 300 }, 'Ratto in vista');
 
     const player0 = await sceneFor(scene.id, player.cookie);
     const ids = player0.tokens.map((token) => token.id);
