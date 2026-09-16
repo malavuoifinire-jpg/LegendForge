@@ -354,13 +354,17 @@ export const createTokenInputSchema = z.object({
   actorId: uuidSchema.nullable().optional(),
   x: finiteNumber,
   y: finiteNumber,
-  sizeInCells: z.number().positive().max(20).default(1),
-  color: hexColorSchema.default('#60a5fa'),
+  /** Assenti significa: prendili dal personaggio, o usa i valori di base. */
+  sizeInCells: z.number().positive().max(20).optional(),
+  color: hexColorSchema.optional(),
   disposition: tokenDispositionSchema.default('neutral'),
   hidden: z.boolean().default(false),
   /** Se true il server aggancia la posizione alla griglia della scena. */
   snapToGrid: z.boolean().default(true),
 });
+
+export const DEFAULT_TOKEN_SIZE_IN_CELLS = 1;
+export const DEFAULT_TOKEN_COLOR = '#94a3b8';
 export type CreateTokenInput = z.infer<typeof createTokenInputSchema>;
 
 export const updateTokenInputSchema = z.object({

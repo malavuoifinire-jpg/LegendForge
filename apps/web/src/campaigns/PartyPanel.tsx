@@ -146,7 +146,10 @@ export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
             const name = newActorName.trim();
             if (!name) return;
             void act(async () => {
-              await api.createActor(campaignId, { name });
+              // Colori distinti per distinguere i personaggi sul tavolo a colpo
+              // d'occhio, senza doverli scegliere ogni volta.
+              const color = ACTOR_COLORS[actors.length % ACTOR_COLORS.length] ?? '#60a5fa';
+              await api.createActor(campaignId, { name, color });
               setNewActorName('');
             });
           }}
@@ -230,6 +233,8 @@ export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
     </div>
   );
 }
+
+const ACTOR_COLORS = ['#60a5fa', '#4ade80', '#c084fc', '#fbbf24', '#f472b6', '#22d3ee'];
 
 function inviteLabel(invite: Invite): string {
   switch (invite.status) {

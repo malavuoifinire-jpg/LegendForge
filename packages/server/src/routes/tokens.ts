@@ -1,5 +1,7 @@
 import {
   createTokenInputSchema,
+  DEFAULT_TOKEN_COLOR,
+  DEFAULT_TOKEN_SIZE_IN_CELLS,
   updateTokenInputSchema,
   type Token,
   type TokenDisposition,
@@ -156,8 +158,11 @@ export function tokenRoutes(context: ServerContext): Route[] {
         const input = parseBody(createTokenInputSchema, request.body);
 
         const actorId: string | null = input.actorId ?? null;
-        let sizeInCells = input.sizeInCells;
-        let color = input.color;
+        // Una pedina legata a un personaggio ne eredita taglia e colore, a meno
+        // che non siano stati indicati espressamente: è il personaggio a dire
+        // che aspetto ha, non chi lo mette sul tavolo.
+        let sizeInCells = input.sizeInCells ?? DEFAULT_TOKEN_SIZE_IN_CELLS;
+        let color = input.color ?? DEFAULT_TOKEN_COLOR;
         if (actorId) {
           const actors = await context.pool.query<{
             size_in_cells: number;
@@ -170,9 +175,8 @@ export function tokenRoutes(context: ServerContext): Route[] {
           );
           const actor = actors.rows[0];
           if (!actor) throw new HttpError(404, 'not_found', 'Personaggio non trovato');
-          // La pedina eredita dal personaggio ciò che non è stato indicato.
-          sizeInCells = input.sizeInCells === 1 ? actor.size_in_cells : input.sizeInCells;
-          color = input.color === '#60a5fa' ? actor.color : input.color;
+          sizeInCells = input.sizeInCells ?? actor.size_in_cells;
+          color = input.color ?? actor.color;
         }
 
         const grid = await gridOf(context, access.sceneId);

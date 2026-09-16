@@ -221,7 +221,8 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
         actorId: actor ? actor.id : null,
         x: center.x + (index % 4) * grid.cellSizePx,
         y: center.y + Math.floor(index / 4) * grid.cellSizePx,
-        color: TOKEN_COLORS[scene.tokens.length % TOKEN_COLORS.length] ?? '#60a5fa',
+        // Con un personaggio il colore lo decide lui; senza, si ruota la tavolozza.
+        ...(actor ? {} : { color: TOKEN_COLORS[index % TOKEN_COLORS.length] ?? '#94a3b8' }),
       });
       setScene((current) => {
         if (!current) return current;
