@@ -3,6 +3,7 @@ import { getPool, type DatabasePool } from './db.js';
 import { createRouter, errorBody, type AppRequest, type AppResponse, type Router } from './http.js';
 import { runMigrations, type MigrationOutcome } from './migrations/run.js';
 import { healthRoutes } from './routes/health.js';
+import { diagnosticsRoutes } from './routes/diagnostics.js';
 import { sessionRoutes } from './routes/session.js';
 import { campaignRoutes } from './routes/campaigns.js';
 import type { ServerContext } from './context.js';
@@ -27,7 +28,7 @@ async function ensureMigrations(env: ServerEnv, pool: DatabasePool | null): Prom
 }
 
 export function createApp(env: ServerEnv, pool: DatabasePool | null): Router {
-  const routes = [...healthRoutes(env, pool, () => migrationOutcome)];
+  const routes = [...healthRoutes(env, pool, () => migrationOutcome), ...diagnosticsRoutes(env)];
 
   // Le rotte che toccano i dati esistono solo se c'è un database configurato.
   if (pool) {
@@ -60,7 +61,8 @@ export async function handleRequest(request: AppRequest): Promise<AppResponse> {
 
   // Lo schema non allineato non deve rendere muto il controllo di stato: è
   // proprio lì che si legge il motivo del problema.
-  if (migrationOutcome && !migrationOutcome.ok && request.path !== '/api/health') {
+  const alwaysAvailable = request.path === '/api/health' || request.path.startsWith('/api/diagnostics/');
+  if (migrationOutcome && !migrationOutcome.ok && !alwaysAvailable) {
     return {
       status: 503,
       body: errorBody('schema_unavailable', 'Lo schema del database non è pronto'),
