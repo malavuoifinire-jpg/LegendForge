@@ -94,6 +94,73 @@ export async function seatUsage(
   return rows[0] ?? null;
 }
 
+/**
+ * Fa entrare nella campagna una persona che ha già un account.
+ *
+ * Stessa transazione e stessi controlli dell'accettazione con account nuovo:
+ * cambia solo che l'utente esiste di già.
+ */
+export async function joinWithExistingAccount(
+  pool: DatabasePool,
+  token: string,
+  userId: string,
+): Promise<{ ok: true; campaignId: string } | { ok: false; reason: 'invalid' | 'full' | 'already' }> {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const invites = await client.query<InviteRow>(
+      `SELECT id, campaign_id, label, max_uses, used_count, expires_at, revoked_at,
+              created_at, updated_at, version
+         FROM invites WHERE token_hash = $1 FOR UPDATE`,
+      [hashToken(token)],
+    );
+    const invite = invites.rows[0];
+    if (!invite || inviteStatus(invite) !== 'active') {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'invalid' };
+    }
+
+    const existing = await client.query(
+      'SELECT 1 FROM campaign_memberships WHERE campaign_id = $1 AND user_id = $2',
+      [invite.campaign_id, userId],
+    );
+    if (existing.rows.length > 0) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'already' };
+    }
+
+    const seats = await client.query<{ player_slots: number; joined: number }>(
+      `SELECT c.player_slots,
+              (SELECT count(*)::int FROM campaign_memberships m
+                WHERE m.campaign_id = c.id AND m.role = 'player' AND m.status = 'active') AS joined
+         FROM campaigns c WHERE c.id = $1 AND c.deleted_at IS NULL FOR UPDATE`,
+      [invite.campaign_id],
+    );
+    const seat = seats.rows[0];
+    if (!seat || seat.joined >= seat.player_slots) {
+      await client.query('ROLLBACK');
+      return { ok: false, reason: 'full' };
+    }
+
+    await client.query(
+      `INSERT INTO campaign_memberships (campaign_id, user_id, role) VALUES ($1, $2, 'player')`,
+      [invite.campaign_id, userId],
+    );
+    await client.query(
+      `UPDATE invites SET used_count = used_count + 1, updated_at = now(), version = version + 1
+        WHERE id = $1`,
+      [invite.id],
+    );
+    await client.query('COMMIT');
+    return { ok: true, campaignId: invite.campaign_id };
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
 export type AcceptOutcome =
   | { ok: true; userId: string }
   | { ok: false; reason: 'invalid' | 'full' | 'name_taken' };

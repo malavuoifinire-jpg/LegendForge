@@ -8,7 +8,7 @@ interface AuthScreenProps {
   onAuthenticated: (viewer: Viewer) => void;
 }
 
-type Mode = 'setup' | 'login' | 'recover';
+type Mode = 'setup' | 'login' | 'recover' | 'register';
 
 export function AuthScreen({ state, onAuthenticated }: AuthScreenProps) {
   const [mode, setMode] = useState<Mode>(state.instanceClaimed ? 'login' : 'setup');
@@ -23,7 +23,14 @@ export function AuthScreen({ state, onAuthenticated }: AuthScreenProps) {
 
         {mode === 'setup' && <SetupForm onDone={onAuthenticated} />}
         {mode === 'login' && (
-          <LoginForm onDone={onAuthenticated} onRecover={() => setMode('recover')} />
+          <LoginForm
+            onDone={onAuthenticated}
+            onRecover={() => setMode('recover')}
+            onRegister={state.openRegistration ? () => setMode('register') : null}
+          />
+        )}
+        {mode === 'register' && (
+          <RegisterForm onDone={onAuthenticated} onCancel={() => setMode('login')} />
         )}
         {mode === 'recover' && (
           <RecoverForm onDone={onAuthenticated} onCancel={() => setMode('login')} />
@@ -157,9 +164,11 @@ function SetupForm({ onDone }: { onDone: (viewer: Viewer) => void }) {
 function LoginForm({
   onDone,
   onRecover,
+  onRegister,
 }: {
   onDone: (viewer: Viewer) => void;
   onRecover: () => void;
+  onRegister: (() => void) | null;
 }) {
   const [displayName, setDisplayName] = useState('');
   const [pin, setPin] = useState('');
@@ -203,8 +212,90 @@ function LoginForm({
       <button type="submit" className="gate__submit" disabled={busy}>
         {busy ? 'Verifica…' : 'Entra'}
       </button>
+      {onRegister && (
+        <button type="button" className="gate__link" onClick={onRegister}>
+          Non hai un account? Creane uno
+        </button>
+      )}
       <button type="button" className="gate__link" onClick={onRecover}>
         Ho perso il PIN
+      </button>
+    </form>
+  );
+}
+
+function RegisterForm({
+  onDone,
+  onCancel,
+}: {
+  onDone: (viewer: Viewer) => void;
+  onCancel: () => void;
+}) {
+  const [displayName, setDisplayName] = useState('');
+  const [pin, setPin] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const { busy, error, run, setError } = useSubmit();
+
+  return (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (pin !== confirm) {
+          setError('I due PIN non coincidono');
+          return;
+        }
+        void run(async () => {
+          const { viewer } = await api.register({ displayName: displayName.trim(), pin });
+          onDone(viewer);
+        });
+      }}
+    >
+      <h1>Nuovo account</h1>
+      <p className="gate__lead">
+        Nome e PIN sono le tue credenziali: non c&apos;è una email per recuperarle, quindi
+        segnatele. L&apos;account da solo non apre nessuna campagna — per entrare servirà il codice
+        che ti dà il Game Master.
+      </p>
+
+      <Field label="Il tuo nome al tavolo">
+        <input
+          value={displayName}
+          onChange={(event) => setDisplayName(event.target.value)}
+          required
+          autoFocus
+          maxLength={80}
+          autoComplete="nickname"
+        />
+      </Field>
+
+      <Field label="PIN (almeno 6 caratteri)">
+        <input
+          type="password"
+          value={pin}
+          onChange={(event) => setPin(event.target.value)}
+          minLength={6}
+          required
+          autoComplete="new-password"
+        />
+      </Field>
+
+      <Field label="Ripeti il PIN">
+        <input
+          type="password"
+          value={confirm}
+          onChange={(event) => setConfirm(event.target.value)}
+          required
+          autoComplete="new-password"
+        />
+      </Field>
+
+      {error && <p className="gate__error">{error}</p>}
+
+      <button type="submit" className="gate__submit" disabled={busy}>
+        {busy ? 'Creazione…' : 'Crea account'}
+      </button>
+      <button type="button" className="gate__link" onClick={onCancel}>
+        Ho già un account
       </button>
     </form>
   );

@@ -79,7 +79,13 @@ export function CampaignScreen({ campaign, onBack, onOpenScene }: CampaignScreen
         </ul>
       )}
 
-      {isGameMaster && <PartyPanel campaignId={campaign.id} playerSlots={campaign.playerSlots} />}
+      {isGameMaster && (
+        <PartyPanel
+          campaignId={campaign.id}
+          playerSlots={campaign.playerSlots}
+          joinCode={campaign.joinCode}
+        />
+      )}
 
       {creating && (
         <NewSceneDialog

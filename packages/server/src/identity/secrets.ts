@@ -32,6 +32,20 @@ export function generateRecoveryCode(): string {
   return groups.join('-');
 }
 
+/**
+ * Codice di una campagna: due gruppi da quattro caratteri, leggibile a voce e
+ * trascrivibile senza ambiguità. Non è un segreto forte come un link d'invito,
+ * quindi i tentativi sono limitati e il Game Master può rigenerarlo.
+ */
+export function generateJoinCode(): string {
+  const group = (): string => {
+    let out = '';
+    for (let i = 0; i < 4; i += 1) out += RECOVERY_ALPHABET[randomInt(RECOVERY_ALPHABET.length)];
+    return out;
+  };
+  return `${group()}-${group()}`;
+}
+
 /** Normalizza un codice digitato dall'utente prima del confronto. */
 export function normalizeRecoveryCode(input: string): string {
   return input.toUpperCase().replace(/[^A-Z0-9]/gu, '');
@@ -39,4 +53,10 @@ export function normalizeRecoveryCode(input: string): string {
 
 export function canonicalRecoveryCode(code: string): string {
   return normalizeRecoveryCode(code);
+}
+
+/** Riporta un codice campagna alla forma con cui è salvato. */
+export function canonicalJoinCode(input: string): string {
+  const cleaned = normalizeRecoveryCode(input);
+  return cleaned.length === 8 ? `${cleaned.slice(0, 4)}-${cleaned.slice(4)}` : cleaned;
 }

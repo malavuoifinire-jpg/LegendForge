@@ -13,6 +13,59 @@ type Boot =
   | { phase: 'ready'; state: SessionState }
   | { phase: 'error'; message: string };
 
+function InviteForExistingAccount({
+  token,
+  viewer,
+  onDone,
+  onSwitchAccount,
+}: {
+  token: string;
+  viewer: Viewer;
+  onDone: () => void;
+  onSwitchAccount: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <div className="gate">
+      <div className="gate__card">
+        <div className="brand brand--large">
+          <span className="brand__mark" aria-hidden="true" />
+          <span className="brand__name">LegendForge</span>
+        </div>
+        <h1>Invito a una campagna</h1>
+        <p className="gate__lead">
+          In questo browser sei già entrato come <strong>{viewer.displayName}</strong>. Vuoi unirti
+          alla campagna con questo account?
+        </p>
+        {error && <p className="gate__error">{error}</p>}
+        <button
+          type="button"
+          className="gate__submit"
+          disabled={busy}
+          onClick={() => {
+            setBusy(true);
+            setError(null);
+            api
+              .joinWithInvite(token)
+              .then(onDone)
+              .catch((caught: unknown) => {
+                setError(caught instanceof ApiError ? caught.message : 'Ingresso non riuscito');
+              })
+              .finally(() => setBusy(false));
+          }}
+        >
+          {busy ? 'Un momento…' : `Entra come ${viewer.displayName}`}
+        </button>
+        <button type="button" className="gate__link" onClick={onSwitchAccount}>
+          Esci e usa un altro account
+        </button>
+      </div>
+    </div>
+  );
+}
+
 /** Estrae il token da un indirizzo del tipo /entra/&lt;token&gt;. */
 function readInviteToken(): string | null {
   const match = /^\/entra\/([^/]+)\/?$/u.exec(window.location.pathname);
@@ -72,11 +125,23 @@ export function App() {
     );
   }
 
-  // Un link d'invito porta direttamente alla schermata di ingresso, anche se
-  // in questo browser c'è già una sessione di qualcun altro.
   const inviteToken = readInviteToken();
   if (inviteToken && !viewer) {
     return <JoinScreen token={inviteToken} onJoined={(next) => setViewer(next)} />;
+  }
+  // Chi ha già un account non deve crearne un altro per accettare un invito.
+  if (inviteToken && viewer) {
+    return (
+      <InviteForExistingAccount
+        token={inviteToken}
+        viewer={viewer}
+        onDone={() => {
+          window.history.replaceState(null, '', '/');
+          void load();
+        }}
+        onSwitchAccount={() => void logout()}
+      />
+    );
   }
 
   if (!viewer) {

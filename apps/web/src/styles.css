@@ -957,3 +957,31 @@ button {
   opacity: 0.5;
   cursor: default;
 }
+
+.join-code {
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  max-width: 460px;
+}
+
+.join-code__label {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 7px;
+}
+
+.join-code .inline-form {
+  margin-bottom: 0;
+}
+
+.join-code input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0.08em;
+}
+
+.invite-fresh + .plain-list {
+  margin-top: 4px;
+}

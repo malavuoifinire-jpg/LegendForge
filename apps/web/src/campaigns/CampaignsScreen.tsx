@@ -39,6 +39,16 @@ export function CampaignsScreen({ onOpen }: CampaignsScreenProps) {
         </button>
       </div>
 
+      <JoinByCode
+        onJoined={(campaign) => {
+          setCampaigns((current) => {
+            const others = (current ?? []).filter((item) => item.id !== campaign.id);
+            return [campaign, ...others];
+          });
+          onOpen(campaign);
+        }}
+      />
+
       {error && <p className="gate__error">{error}</p>}
 
       {campaigns === null && <p className="panel__hint">Caricamento…</p>}
@@ -160,5 +170,55 @@ function CreateCampaignDialog({
         </div>
       </form>
     </div>
+  );
+}
+
+/**
+ * Ingresso in una campagna con il codice.
+ *
+ * È la via normale per chi ha già un account: il Game Master detta otto
+ * caratteri e non serve far circolare nessun link.
+ */
+function JoinByCode({ onJoined }: { onJoined: (campaign: Campaign) => void }) {
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <form
+      className="join-code"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!code.trim()) return;
+        setBusy(true);
+        setError(null);
+        api
+          .joinCampaign(code.trim())
+          .then(onJoined)
+          .catch((caught: unknown) => {
+            setError(caught instanceof ApiError ? caught.message : 'Ingresso non riuscito');
+          })
+          .finally(() => setBusy(false));
+      }}
+    >
+      <label className="join-code__label" htmlFor="codice-campagna">
+        Hai un codice campagna? Inseriscilo qui
+      </label>
+      <div className="inline-form">
+        <input
+          id="codice-campagna"
+          value={code}
+          onChange={(event) => setCode(event.target.value.toUpperCase())}
+          placeholder="ABCD-EFGH"
+          maxLength={20}
+          autoComplete="off"
+          spellCheck={false}
+        />
+        <button type="submit" className="primary" disabled={busy || !code.trim()}>
+          {busy ? 'Verifica…' : 'Entra'}
+        </button>
+      </div>
+      {error && <p className="gate__error">{error}</p>}
+    </form>
   );
 }

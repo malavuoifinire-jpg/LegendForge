@@ -105,6 +105,8 @@ export type Viewer = z.infer<typeof viewerSchema>;
 export const sessionStateSchema = z.object({
   /** True se qualcuno ha già rivendicato questa istanza con un PIN. */
   instanceClaimed: z.boolean(),
+  /** True se chiunque può crearsi un account su questa istanza. */
+  openRegistration: z.boolean(),
   viewer: viewerSchema.nullable(),
 });
 export type SessionState = z.infer<typeof sessionStateSchema>;
@@ -121,6 +123,12 @@ export const setupResultSchema = z.object({
   recoveryCode: z.string(),
 });
 export type SetupResult = z.infer<typeof setupResultSchema>;
+
+export const registerInputSchema = z.object({
+  displayName: z.string().trim().min(1).max(80),
+  pin: pinSchema,
+});
+export type RegisterInput = z.infer<typeof registerInputSchema>;
 
 export const loginInputSchema = z.object({
   /**
@@ -254,8 +262,18 @@ export const campaignSchema = entityMetaSchema.extend({
   /** Ruolo di chi sta guardando dentro questa campagna. */
   viewerRole: campaignRoleSchema,
   sceneCount: z.number().int().nonnegative(),
+  /**
+   * Codice con cui si entra nella campagna. Lo vede solo il Game Master:
+   * per gli altri è null, perché non è una loro informazione.
+   */
+  joinCode: z.string().nullable(),
 });
 export type Campaign = z.infer<typeof campaignSchema>;
+
+export const joinCampaignInputSchema = z.object({
+  code: z.string().trim().min(4).max(20),
+});
+export type JoinCampaignInput = z.infer<typeof joinCampaignInputSchema>;
 
 /* ------------------------------ mappe e file ------------------------------ */
 

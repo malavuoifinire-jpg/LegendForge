@@ -263,7 +263,38 @@ ALTER TABLE actor_ownership ENABLE ROW LEVEL SECURITY;
 ALTER TABLE scene_events   ENABLE ROW LEVEL SECURITY;
 `;
 
+const JOIN_CODES = `
+-- Codice della campagna: si crea un account una volta sola e poi si entra
+-- nelle campagne con un codice, invece di dipendere da un link usa e getta.
+ALTER TABLE campaigns ADD COLUMN join_code text;
+CREATE UNIQUE INDEX campaigns_join_code_unique ON campaigns (join_code)
+  WHERE join_code IS NOT NULL;
+
+-- Le campagne già esistenti ne ricevono uno.
+UPDATE campaigns
+   SET join_code = upper(
+         substr(translate(encode(gen_random_bytes(16), 'base64'), '01OIl+/=', 'GHJKMNPQ'), 1, 4)
+         || '-' ||
+         substr(translate(encode(gen_random_bytes(16), 'base64'), '01OIl+/=', 'RSTUVWXY'), 1, 4)
+       )
+ WHERE join_code IS NULL;
+
+-- Chi può creare un account su questa istanza.
+ALTER TABLE instance_state ADD COLUMN open_registration boolean NOT NULL DEFAULT true;
+
+-- Contatori per limitare i tentativi: registrazioni e codici indovinati a caso.
+CREATE TABLE rate_limits (
+  bucket        text NOT NULL,
+  key           text NOT NULL,
+  window_start  timestamptz NOT NULL DEFAULT now(),
+  count         integer NOT NULL DEFAULT 0,
+  PRIMARY KEY (bucket, key)
+);
+ALTER TABLE rate_limits ENABLE ROW LEVEL SECURITY;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init', sql: INIT },
   { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
+  { name: '0003_join_codes', sql: JOIN_CODES },
 ];

@@ -22,6 +22,7 @@ import type {
   CreateInviteInput,
   Invite,
   InvitePreview,
+  RegisterInput,
   SceneEvents,
   Token,
   UpdateGridInput,
@@ -91,6 +92,7 @@ export const api = {
   health: () => request<Health>('/api/health'),
   sessionState: () => request<SessionState>('/api/session'),
   setup: (input: SetupInput) => post<SetupResult>('/api/setup', input),
+  register: (input: RegisterInput) => post<{ viewer: Viewer }>('/api/register', input),
   login: (pin: string, displayName?: string) =>
     post<{ viewer: Viewer }>('/api/session', displayName ? { pin, displayName } : { pin }),
   logout: () => request<{ ok: boolean }>('/api/session', { method: 'DELETE' }),
@@ -98,6 +100,11 @@ export const api = {
     post<{ recoveryCode: string }>('/api/session/recover', { recoveryCode, newPin }),
   listCampaigns: () => request<Campaign[]>('/api/campaigns'),
   createCampaign: (input: CreateCampaignInput) => post<Campaign>('/api/campaigns', input),
+  joinCampaign: (code: string) => post<Campaign>('/api/campaigns/join', { code }),
+  rotateJoinCode: (campaignId: string) =>
+    post<{ joinCode: string | null }>(`/api/campaigns/${campaignId}/join-code`, {}),
+  joinWithInvite: (token: string) =>
+    post<{ campaignId: string }>(`/api/invites/${encodeURIComponent(token)}/join`, {}),
 
   listMaps: (campaignId: string) => request<MapAsset[]>(`/api/campaigns/${campaignId}/maps`),
   requestUpload: (campaignId: string, input: RequestUploadInput) =>

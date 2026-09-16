@@ -13,6 +13,7 @@ import { serializeSessionCookie } from '../identity/cookies.js';
 import {
   acceptInvite,
   createInvite,
+  joinWithExistingAccount,
   findInviteByToken,
   inviteStatus,
   seatUsage,
@@ -189,6 +190,30 @@ export function inviteRoutes(context: ServerContext): Route[] {
           },
           body: { viewer },
         };
+      },
+    },
+
+    {
+      /** Per chi ha già un account: l'invito lo fa entrare, non lo registra. */
+      method: 'POST',
+      pattern: '/api/invites/:token/join',
+      async handle({ request, params }) {
+        const viewer = await requireViewer(context, request);
+        const outcome = await joinWithExistingAccount(
+          context.pool,
+          params.token ?? '',
+          viewer.id,
+        );
+        if (!outcome.ok) {
+          if (outcome.reason === 'already') {
+            throw new HttpError(409, 'already_member', 'Sei già in questa campagna');
+          }
+          if (outcome.reason === 'full') {
+            throw new HttpError(409, 'campaign_full', 'La campagna ha esaurito i posti');
+          }
+          throw new HttpError(404, 'invalid_invite', 'Invito non valido, scaduto o revocato');
+        }
+        return { status: 200, body: { campaignId: outcome.campaignId } };
       },
     },
 

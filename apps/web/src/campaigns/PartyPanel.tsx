@@ -5,13 +5,15 @@ import { ApiError, api } from '../api/client';
 interface PartyPanelProps {
   campaignId: string;
   playerSlots: number;
+  joinCode: string | null;
 }
 
 /**
  * Gestione del tavolo: chi partecipa, quali personaggi controlla, quali link
  * d'invito sono in circolazione.
  */
-export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
+export function PartyPanel({ campaignId, playerSlots, joinCode }: PartyPanelProps) {
+  const [code, setCode] = useState(joinCode);
   const [members, setMembers] = useState<CampaignMember[]>([]);
   const [invites, setInvites] = useState<Invite[]>([]);
   const [actors, setActors] = useState<Actor[]>([]);
@@ -60,7 +62,42 @@ export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
     <div className="party">
       <section className="panel">
         <header className="panel__header">
-          <h2>Inviti</h2>
+          <h2>Codice della campagna</h2>
+          <button
+            type="button"
+            className="panel__action"
+            disabled={busy}
+            onClick={() =>
+              void act(async () => {
+                const result = await api.rotateJoinCode(campaignId);
+                setCode(result.joinCode);
+              })
+            }
+          >
+            Rigenera
+          </button>
+        </header>
+        <p className="panel__hint">
+          Chi ha già un account entra da solo con questo codice. Puoi dettarlo a voce.
+        </p>
+        <output className="recovery-code">{code ?? '—'}</output>
+        <button
+          type="button"
+          className="panel__action panel__wide"
+          onClick={() => {
+            if (code) void navigator.clipboard?.writeText(code).catch(() => undefined);
+          }}
+        >
+          Copia il codice
+        </button>
+        <p className="panel__hint">
+          Rigenerandolo il precedente smette di funzionare, ma chi è già dentro resta dentro.
+        </p>
+      </section>
+
+      <section className="panel">
+        <header className="panel__header">
+          <h2>Inviti con link</h2>
           <button
             type="button"
             className="panel__action"
@@ -99,7 +136,11 @@ export function PartyPanel({ campaignId, playerSlots }: PartyPanelProps) {
           </div>
         )}
 
-        {invites.length === 0 && <p className="panel__hint">Nessun invito creato.</p>}
+        {invites.length === 0 && (
+          <p className="panel__hint">
+            Nessun link creato. Un link fa entrare in un clic anche chi non ha ancora un account.
+          </p>
+        )}
 
         <ul className="plain-list">
           {invites.map((invite) => (
