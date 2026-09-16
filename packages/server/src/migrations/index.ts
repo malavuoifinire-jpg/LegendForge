@@ -342,11 +342,14 @@ CREATE INDEX scene_lights_token_idx ON scene_lights (token_id) WHERE token_id IS
 ALTER TABLE scenes
   ADD COLUMN vision_enabled     boolean NOT NULL DEFAULT false,
   ADD COLUMN fog_enabled        boolean NOT NULL DEFAULT true,
-  ADD COLUMN ambient_darkness   double precision NOT NULL DEFAULT 0
-             CHECK (ambient_darkness >= 0 AND ambient_darkness <= 1),
   -- Fin dove arriva lo sguardo quando la vista normale è illimitata.
   ADD COLUMN scene_reach_meters double precision NOT NULL DEFAULT 60
              CHECK (scene_reach_meters > 0);
+
+-- ambient_darkness esisteva già dalla 0001, dichiarata \`real\` in previsione di
+-- questo momento. Tutte le altre misure del dominio sono in doppia precisione:
+-- allinearla adesso evita un solo numero che arrotonda diversamente dagli altri.
+ALTER TABLE scenes ALTER COLUMN ambient_darkness TYPE double precision;
 
 -- Sensi di un attore. I valori di regola stanno nel RuleSet, qui c'è solo
 -- quanto ne ha questo personaggio.
