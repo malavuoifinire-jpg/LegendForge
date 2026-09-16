@@ -78,6 +78,7 @@ export function VisionPanel({
   onDeleteLight,
   onPreview,
 }: VisionPanelProps) {
+  const previewing = previewTokenId !== null;
   const wallCount = vision.walls?.length ?? 0;
   const lightCount = vision.lights?.length ?? 0;
   void sceneVersion;
@@ -87,7 +88,7 @@ export function VisionPanel({
       <header className="panel__header">
         <h2>Visione</h2>
         <span className="badge">
-          {wallCount} muri · {lightCount} luci
+          {previewing ? 'in anteprima' : `${wallCount} muri · ${lightCount} luci`}
         </span>
       </header>
 
@@ -151,6 +152,12 @@ export function VisionPanel({
       {/* ------------------------------- muri -------------------------------- */}
 
       <h3 className="panel__subheader">Muri</h3>
+      {previewing ? (
+        <p className="panel__hint">
+          Stai guardando dagli occhi di una pedina, quindi i muri non ti arrivano e non puoi
+          disegnarli. Torna al punto di vista del Game Master per modificarli.
+        </p>
+      ) : (
       <div className="wizard__actions">
         <button
           type="button"
@@ -167,6 +174,7 @@ export function VisionPanel({
           {tool === 'light' ? 'Smetti' : 'Posiziona luce'}
         </button>
       </div>
+      )}
 
       {tool === 'wall' && (
         <>
@@ -261,7 +269,7 @@ export function VisionPanel({
         </div>
       )}
 
-      {wallCount > 0 && (
+      {wallCount > 0 && !previewing && (
         <button
           type="button"
           className="panel__action panel__action--danger"
