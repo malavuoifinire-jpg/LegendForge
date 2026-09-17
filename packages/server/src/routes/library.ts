@@ -245,8 +245,15 @@ async function requirePackAccess(
   viewer: { id: string },
   packId: string,
 ): Promise<{ pack: ContentPack; role: CampaignRole }> {
+  // Il ruolo va chiesto esplicitamente: SELECT_PACKS elenca solo le colonne
+  // del pacchetto, e una `m.role` dimenticata qui diventa un Game Master che
+  // riceve 403 a casa propria.
   const { rows } = await context.pool.query<PackRow & { role: CampaignRole }>(
-    `${SELECT_PACKS}
+    `SELECT p.id, p.campaign_id, p.slug, p.name, p.pack_version, p.license, p.attribution,
+            p.source_url, p.locked, p.created_at, p.updated_at, p.version, m.role,
+            (SELECT count(*) FROM library_entries e
+              WHERE e.pack_id = p.id AND e.deleted_at IS NULL) AS entry_count
+       FROM content_packs p
        JOIN campaigns c ON c.id = p.campaign_id AND c.deleted_at IS NULL
        JOIN campaign_memberships m
          ON m.campaign_id = p.campaign_id AND m.user_id = $2 AND m.status = 'active'
