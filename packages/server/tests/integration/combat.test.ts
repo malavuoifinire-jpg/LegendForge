@@ -348,19 +348,24 @@ describe('terreno e muri', () => {
         cookie: gmCookie,
         body: {
           kind: 'difficult',
+          // Copre i centri delle caselle 2 e 3, non quello della 4: il
+          // terreno di una casella lo decide il suo centro.
           points: [
             { x: 100, y: -50 },
-            { x: 250, y: -50 },
-            { x: 250, y: 100 },
+            { x: 200, y: -50 },
+            { x: 200, y: 100 },
             { x: 100, y: 100 },
           ],
         },
       }),
     );
     await startEncounter();
-    // Quattro caselle, due delle quali nel fango: 1 + 1 + 2 + 2 = 6 caselle = 9 m.
+    // Quattro passi, due dei quali nel fango: 1 + 2 + 2 + 1 = 6 caselle = 9 m,
+    // che e esattamente il budget: passa, e non resta niente.
     const response = await move(token, [at(4, 0)], gmCookie);
+    expect(response.status).toBe(200);
     expect((response.body as MoveResult).costMeters).toBeCloseTo(9, 6);
+    expect((response.body as MoveResult).remainingMeters).toBeCloseTo(0, 6);
   });
 
   it('un muro ferma il percorso e la pedina si ferma li', async () => {
