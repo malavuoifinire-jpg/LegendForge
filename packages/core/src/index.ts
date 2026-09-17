@@ -7,3 +7,4 @@ export * from './grid-detection/signal.js';
 export * from './grid-detection/detector.js';
 export * from './grid-detection/synthetic.js';
 export * from './vision/index.js';
+export * from './movement/index.js';
