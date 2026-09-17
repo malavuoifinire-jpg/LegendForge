@@ -1067,3 +1067,203 @@ button {
 .field--inline input[type='number'] {
   width: 84px;
 }
+
+/* ------------------------------ libreria ------------------------------ */
+
+.library__kinds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 14px 0 12px;
+}
+
+.library__kind {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 12px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.library__kind:hover {
+  border-color: var(--accent);
+  color: inherit;
+}
+
+.library__kind--on {
+  color: var(--bg);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.library__count {
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  opacity: 0.75;
+}
+
+.library__layout {
+  display: grid;
+  grid-template-columns: 210px minmax(220px, 300px) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+
+@media (max-width: 1100px) {
+  .library__layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.library__folders {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  position: sticky;
+  top: 12px;
+}
+
+.folder {
+  text-align: left;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 8px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.folder:hover {
+  color: inherit;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.folder--child {
+  padding-left: 20px;
+  font-size: 12px;
+}
+
+.folder--on {
+  color: var(--accent);
+  background: rgba(126, 231, 255, 0.08);
+}
+
+.library__list {
+  max-height: 72vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.library__alias {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+  padding-left: 8px;
+}
+
+.library__detail {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.entry__original {
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-style: italic;
+}
+
+.entry__body p {
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 0 0 9px;
+}
+
+.entry__body--note {
+  border-left: 2px solid var(--line);
+  padding-left: 10px;
+}
+
+.entry__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 0;
+}
+
+.entry__more summary {
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--accent);
+}
+
+.entry__code {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 8px;
+  resize: vertical;
+}
+
+.kv__row {
+  display: contents;
+}
+
+.pack__attribution {
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--muted);
+  margin: 4px 0 0;
+  max-height: 4.6em;
+  overflow: hidden;
+}
+
+.progress {
+  position: relative;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.progress__bar {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: rgba(126, 231, 255, 0.28);
+  transition: width 0.2s ease-out;
+}
+
+.progress__label {
+  position: relative;
+  display: block;
+  text-align: center;
+  line-height: 22px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.library__folders input[type='search'] {
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 6px 8px;
+  font: inherit;
+  font-size: 13px;
+}

@@ -5,6 +5,7 @@ import { AuthScreen } from './auth/AuthScreen';
 import { JoinScreen } from './auth/JoinScreen';
 import { CampaignsScreen } from './campaigns/CampaignsScreen';
 import { CampaignScreen } from './campaigns/CampaignScreen';
+import { LibraryScreen } from './library/LibraryScreen';
 import { SceneView } from './scene/SceneView';
 import { StatusPanel } from './panels/StatusPanel';
 
@@ -77,6 +78,7 @@ export function App() {
   const [viewer, setViewer] = useState<Viewer | null>(null);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
   const [scene, setScene] = useState<Scene | null>(null);
+  const [libraryOpen, setLibraryOpen] = useState(false);
   const [diagnosticsOpen, setDiagnosticsOpen] = useState(false);
 
   const load = useCallback(async () => {
@@ -179,11 +181,17 @@ export function App() {
       <main className="app__main">
         {scene && campaign ? (
           <SceneView sceneId={scene.id} campaignId={campaign.id} onBack={() => setScene(null)} />
+        ) : libraryOpen && campaign ? (
+          <LibraryScreen campaign={campaign} onBack={() => setLibraryOpen(false)} />
         ) : campaign ? (
           <CampaignScreen
             campaign={campaign}
-            onBack={() => setCampaign(null)}
+            onBack={() => {
+              setCampaign(null);
+              setLibraryOpen(false);
+            }}
             onOpenScene={setScene}
+            onOpenLibrary={() => setLibraryOpen(true)}
           />
         ) : (
           <CampaignsScreen onOpen={setCampaign} />

@@ -27,6 +27,16 @@ import type {
   Token,
   UpdateGridInput,
   UpdateActorInput,
+  ContentPack,
+  ContentPackFile,
+  CreateEntryInput,
+  CreatePackInput,
+  ImportPackResult,
+  LibraryEntry,
+  LibraryFolder,
+  LibraryPage,
+  PackEntryFile,
+  UpdateEntryInput,
   UpdateRuleSetInput,
   UpdateTokenInput,
   UploadTicket,
@@ -192,6 +202,33 @@ export const api = {
     patch<LightSource>(`/api/lights/${lightId}`, input),
   deleteLight: (lightId: string) =>
     request<{ ok: boolean }>(`/api/lights/${lightId}`, { method: 'DELETE' }),
+
+  /* -------------------------------- libreria ------------------------------ */
+
+  library: (campaignId: string, query: Record<string, string>) =>
+    request<LibraryPage>(
+      `/api/campaigns/${campaignId}/library?${new URLSearchParams(query).toString()}`,
+    ),
+  libraryEntry: (entryId: string) => request<LibraryEntry>(`/api/library/${entryId}`),
+  createEntry: (campaignId: string, input: CreateEntryInput) =>
+    post<LibraryEntry>(`/api/campaigns/${campaignId}/library`, input),
+  updateEntry: (entryId: string, input: UpdateEntryInput) =>
+    patch<LibraryEntry>(`/api/library/${entryId}`, input),
+  copyEntry: (entryId: string) => post<LibraryEntry>(`/api/library/${entryId}/copy`, {}),
+  deleteEntry: (entryId: string) =>
+    request<{ ok: boolean }>(`/api/library/${entryId}`, { method: 'DELETE' }),
+
+  listFolders: (campaignId: string) =>
+    request<LibraryFolder[]>(`/api/campaigns/${campaignId}/folders`),
+
+  listPacks: (campaignId: string) => request<ContentPack[]>(`/api/campaigns/${campaignId}/packs`),
+  createPack: (campaignId: string, input: CreatePackInput) =>
+    post<ContentPack>(`/api/campaigns/${campaignId}/packs`, input),
+  addPackEntries: (packId: string, entries: PackEntryFile[]) =>
+    post<ImportPackResult>(`/api/packs/${packId}/entries`, { entries }),
+  deletePack: (packId: string) =>
+    request<{ ok: boolean }>(`/api/packs/${packId}`, { method: 'DELETE' }),
+  exportPack: (packId: string) => request<ContentPackFile>(`/api/packs/${packId}/export`),
 
   sceneEvents: (sceneId: string, since: number, signal: AbortSignal) =>
     request<SceneEvents>(`/api/scenes/${sceneId}/events?since=${since}`, { signal }),

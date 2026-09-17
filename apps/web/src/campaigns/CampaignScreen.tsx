@@ -8,9 +8,15 @@ interface CampaignScreenProps {
   campaign: Campaign;
   onBack: () => void;
   onOpenScene: (scene: Scene) => void;
+  onOpenLibrary: () => void;
 }
 
-export function CampaignScreen({ campaign: initial, onBack, onOpenScene }: CampaignScreenProps) {
+export function CampaignScreen({
+  campaign: initial,
+  onBack,
+  onOpenScene,
+  onOpenLibrary,
+}: CampaignScreenProps) {
   // La campagna arriva come proprietà ma le regole si cambiano da qui: la
   // copia locale è quella che comanda finché si sta su questa schermata.
   const [campaign, setCampaign] = useState<Campaign>(initial);
@@ -46,11 +52,16 @@ export function CampaignScreen({ campaign: initial, onBack, onOpenScene }: Campa
             una casella vale {campaign.ruleSet.grid.defaultMetersPerCell} metri
           </p>
         </div>
-        {isGameMaster && (
-          <button type="button" className="primary" onClick={() => setCreating(true)}>
-            Nuova scena
+        <div className="wizard__actions">
+          <button type="button" className="panel__action" onClick={onOpenLibrary}>
+            Libreria
           </button>
-        )}
+          {isGameMaster && (
+            <button type="button" className="primary" onClick={() => setCreating(true)}>
+              Nuova scena
+            </button>
+          )}
+        </div>
       </div>
 
       {error && <p className="gate__error">{error}</p>}
