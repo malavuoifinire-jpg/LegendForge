@@ -485,6 +485,103 @@ const TOKEN_CONTROL = `
 ALTER TABLE tokens ADD COLUMN controlled_by_game_master boolean NOT NULL DEFAULT false;
 `;
 
+const COMBAT = `
+-- Scontri: l'ordine di iniziativa di una scena.
+--
+-- Uno solo alla volta per scena, garantito da un indice parziale invece che da
+-- un controllo applicativo: due Game Master che premono insieme non possono
+-- aprirne due.
+CREATE TABLE encounters (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scene_id     uuid NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  round        integer NOT NULL DEFAULT 1 CHECK (round >= 1),
+  status       text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'ended')),
+  -- Di chi e il turno. Popolata dopo, quando le voci esistono.
+  active_entry_id uuid,
+  started_at   timestamptz NOT NULL DEFAULT now(),
+  ended_at     timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  version      integer NOT NULL DEFAULT 1
+);
+CREATE UNIQUE INDEX encounters_one_active ON encounters (scene_id) WHERE status = 'active';
+
+-- Una riga per pedina nell'ordine di iniziativa.
+CREATE TABLE initiative_entries (
+  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  encounter_id  uuid NOT NULL REFERENCES encounters(id) ON DELETE CASCADE,
+  token_id      uuid NOT NULL REFERENCES tokens(id) ON DELETE CASCADE,
+  initiative    double precision NOT NULL DEFAULT 0,
+  -- A parita di iniziativa decide questo, cosi l'ordine non balla fra una
+  -- lettura e l'altra.
+  tiebreak      integer NOT NULL DEFAULT 0,
+  movement_used_meters double precision NOT NULL DEFAULT 0
+                CHECK (movement_used_meters >= 0),
+  -- Le diagonali gia percorse nel turno: la regola a costo alternato le conta.
+  diagonals_used integer NOT NULL DEFAULT 0 CHECK (diagonals_used >= 0),
+  movement_mode text NOT NULL DEFAULT 'camminare',
+  has_acted     boolean NOT NULL DEFAULT false,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now(),
+  version       integer NOT NULL DEFAULT 1,
+  UNIQUE (encounter_id, token_id)
+);
+CREATE INDEX initiative_entries_order_idx
+  ON initiative_entries (encounter_id, initiative DESC, tiebreak DESC);
+
+ALTER TABLE encounters
+  ADD CONSTRAINT encounters_active_entry_fk
+  FOREIGN KEY (active_entry_id) REFERENCES initiative_entries(id) ON DELETE SET NULL;
+
+-- Ogni movimento registrato: serve ad annullarlo e a rispondere alla domanda
+-- "chi si e mosso dove" a fine turno.
+CREATE TABLE movement_log (
+  id            bigserial PRIMARY KEY,
+  encounter_id  uuid REFERENCES encounters(id) ON DELETE CASCADE,
+  entry_id      uuid REFERENCES initiative_entries(id) ON DELETE CASCADE,
+  token_id      uuid NOT NULL REFERENCES tokens(id) ON DELETE CASCADE,
+  round         integer NOT NULL DEFAULT 1,
+  from_x        double precision NOT NULL,
+  from_y        double precision NOT NULL,
+  to_x          double precision NOT NULL,
+  to_y          double precision NOT NULL,
+  cost_meters   double precision NOT NULL DEFAULT 0,
+  diagonals     integer NOT NULL DEFAULT 0,
+  mode          text NOT NULL DEFAULT 'camminare',
+  waypoints     jsonb NOT NULL DEFAULT '[]'::jsonb,
+  -- Il Game Master ha autorizzato oltre il budget: resta scritto.
+  overridden    boolean NOT NULL DEFAULT false,
+  undone_at     timestamptz,
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+CREATE INDEX movement_log_token_idx ON movement_log (token_id, id DESC);
+CREATE INDEX movement_log_encounter_idx ON movement_log (encounter_id, id DESC);
+
+-- Terreno: regioni disegnate sulla mappa, come i muri ma aree.
+CREATE TABLE terrain_regions (
+  id          uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  scene_id    uuid NOT NULL REFERENCES scenes(id) ON DELETE CASCADE,
+  name        text NOT NULL DEFAULT '' CHECK (char_length(name) <= 120),
+  kind        text NOT NULL DEFAULT 'difficult' CHECK (kind IN ('difficult', 'impassable')),
+  -- Vertici in pixel dell'immagine, come i muri e le pedine.
+  points      jsonb NOT NULL,
+  color       text NOT NULL DEFAULT '#f59e0b' CHECK (color ~* '^#[0-9a-f]{6}$'),
+  created_at  timestamptz NOT NULL DEFAULT now(),
+  updated_at  timestamptz NOT NULL DEFAULT now(),
+  version     integer NOT NULL DEFAULT 1
+);
+CREATE INDEX terrain_regions_scene_idx ON terrain_regions (scene_id);
+
+-- Velocita di un attore, per modo, in metri. Un modo assente significa che
+-- quella creatura non si muove cosi, che non e la stessa cosa che averlo a zero.
+ALTER TABLE actors ADD COLUMN movement jsonb NOT NULL DEFAULT '{"camminare": 9}'::jsonb;
+
+ALTER TABLE encounters         ENABLE ROW LEVEL SECURITY;
+ALTER TABLE initiative_entries ENABLE ROW LEVEL SECURITY;
+ALTER TABLE movement_log       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE terrain_regions    ENABLE ROW LEVEL SECURITY;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init', sql: INIT },
   { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
@@ -493,4 +590,5 @@ export const MIGRATIONS: Migration[] = [
   { name: '0005_exploration', sql: EXPLORATION },
   { name: '0006_library', sql: LIBRARY },
   { name: '0007_token_control', sql: TOKEN_CONTROL },
+  { name: '0008_combat', sql: COMBAT },
 ];

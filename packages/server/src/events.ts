@@ -25,7 +25,9 @@ export type SceneEventKind =
    */
   | 'wall.changed'
   | 'light.changed'
-  | 'vision.changed';
+  | 'vision.changed'
+  | 'encounter.changed'
+  | 'terrain.changed';
 
 export interface SceneEvent {
   id: number;

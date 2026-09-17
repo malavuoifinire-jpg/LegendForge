@@ -219,6 +219,13 @@ export type CampaignMember = z.infer<typeof campaignMemberSchema>;
 export const actorKindSchema = z.enum(['character', 'monster']);
 export type ActorKind = z.infer<typeof actorKindSchema>;
 
+/** Velocità per modo, in metri. Un modo assente significa che non si muove così. */
+export const movementProfileSchema = z.record(
+  z.string().trim().min(1).max(40),
+  z.number().nonnegative().max(10_000),
+);
+export type MovementProfileDto = z.infer<typeof movementProfileSchema>;
+
 export const specialSenseSchema = z.object({
   name: z.string().trim().min(1).max(60),
   rangeMeters: z.number().nonnegative().max(10000),
@@ -248,6 +255,8 @@ export const actorSchema = entityMetaSchema.extend({
   ownerUserIds: z.array(uuidSchema),
   /** Sensi: quanto lontano arriva lo sguardo di questo personaggio. */
   vision: actorVisionSchema,
+  /** Velocità per modo, in metri. */
+  movement: movementProfileSchema,
 });
 export type Actor = z.infer<typeof actorSchema>;
 
@@ -257,6 +266,7 @@ export const createActorInputSchema = z.object({
   sizeInCells: z.number().positive().max(20).default(1),
   color: hexColorSchema.default('#60a5fa'),
   vision: actorVisionSchema.partial().optional(),
+  movement: movementProfileSchema.optional(),
 });
 export type CreateActorInput = z.infer<typeof createActorInputSchema>;
 
@@ -266,6 +276,7 @@ export const updateActorInputSchema = z.object({
   sizeInCells: z.number().positive().max(20).optional(),
   color: hexColorSchema.optional(),
   vision: actorVisionSchema.partial().optional(),
+  movement: movementProfileSchema.optional(),
 });
 export type UpdateActorInput = z.infer<typeof updateActorInputSchema>;
 
@@ -651,6 +662,8 @@ export const sceneEventSchema = z.object({
     'wall.changed',
     'light.changed',
     'vision.changed',
+    'encounter.changed',
+    'terrain.changed',
   ]),
   payload: z.unknown(),
   at: isoDateSchema,
@@ -870,6 +883,129 @@ export type LibraryPage = z.infer<typeof libraryPageSchema>;
 
 /** Quante voci per pagina: un elenco più lungo non si legge comunque. */
 export const LIBRARY_PAGE_SIZE = 100;
+
+/* ------------------------- scontri e movimento --------------------------- */
+
+export const initiativeEntrySchema = entityMetaSchema.extend({
+  encounterId: uuidSchema,
+  tokenId: uuidSchema,
+  initiative: finiteNumber,
+  tiebreak: z.number().int(),
+  movementUsedMeters: z.number().nonnegative(),
+  diagonalsUsed: z.number().int().nonnegative(),
+  movementMode: z.string(),
+  hasActed: z.boolean(),
+  /** Come si chiama la pedina: comodo, e non è un segreto per chi è nello scontro. */
+  tokenName: z.string(),
+  /** Quanto può ancora muoversi, calcolato dal server. */
+  movementTotalMeters: z.number().nonnegative(),
+  movementRemainingMeters: z.number().nonnegative(),
+});
+export type InitiativeEntry = z.infer<typeof initiativeEntrySchema>;
+
+export const encounterSchema = entityMetaSchema.extend({
+  sceneId: uuidSchema,
+  round: z.number().int().min(1),
+  status: z.enum(['active', 'ended']),
+  activeEntryId: uuidSchema.nullable(),
+  entries: z.array(initiativeEntrySchema),
+});
+export type Encounter = z.infer<typeof encounterSchema>;
+
+export const startEncounterInputSchema = z.object({
+  /** Pedine da mettere in ordine. Vuoto significa: tutte quelle sulla scena. */
+  tokenIds: z.array(uuidSchema).max(200).optional(),
+  /** Tira l'iniziativa al posto di chiederla, 1d20 per ciascuno. */
+  rollInitiative: z.boolean().default(true),
+});
+export type StartEncounterInput = z.infer<typeof startEncounterInputSchema>;
+
+export const updateInitiativeInputSchema = z.object({
+  version: entityVersionSchema,
+  initiative: finiteNumber.optional(),
+  movementMode: z.string().trim().min(1).max(40).optional(),
+  hasActed: z.boolean().optional(),
+  /** Azzera il movimento speso: il Game Master rimette le cose a posto. */
+  resetMovement: z.boolean().optional(),
+});
+export type UpdateInitiativeInput = z.infer<typeof updateInitiativeInputSchema>;
+
+export const addCombatantsInputSchema = z.object({
+  tokenIds: z.array(uuidSchema).min(1).max(200),
+  rollInitiative: z.boolean().default(true),
+});
+export type AddCombatantsInput = z.infer<typeof addCombatantsInputSchema>;
+
+/* -------------------------------- terreno -------------------------------- */
+
+export const terrainKindSchema = z.enum(['difficult', 'impassable']);
+export type TerrainRegionKind = z.infer<typeof terrainKindSchema>;
+
+export const terrainRegionSchema = entityMetaSchema.extend({
+  sceneId: uuidSchema,
+  name: z.string(),
+  kind: terrainKindSchema,
+  points: z.array(imagePointSchema).min(3),
+  color: hexColorSchema,
+});
+export type TerrainRegion = z.infer<typeof terrainRegionSchema>;
+
+export const createTerrainInputSchema = z.object({
+  name: z.string().trim().max(120).default(''),
+  kind: terrainKindSchema.default('difficult'),
+  points: z.array(imagePointSchema).min(3).max(200),
+  color: hexColorSchema.default('#f59e0b'),
+});
+export type CreateTerrainInput = z.infer<typeof createTerrainInputSchema>;
+
+/* ------------------------------ spostamento ------------------------------ */
+
+/**
+ * Uno spostamento con il suo percorso.
+ *
+ * I waypoint sono quelli che chi gioca ha posato; il server rifà il conto per
+ * conto suo e non si fida del costo che arriva dal client.
+ */
+export const moveTokenInputSchema = z.object({
+  version: entityVersionSchema,
+  /** Vertici del percorso, in pixel immagine. L'ultimo è l'arrivo. */
+  waypoints: z.array(imagePointSchema).min(1).max(200),
+  mode: z.string().trim().min(1).max(40).optional(),
+  snapToGrid: z.boolean().default(true),
+  /** Il Game Master autorizza oltre il budget. */
+  overrideBudget: z.boolean().default(false),
+});
+export type MoveTokenInput = z.infer<typeof moveTokenInputSchema>;
+
+export const movementRecordSchema = z.object({
+  id: z.number().int().nonnegative(),
+  tokenId: uuidSchema,
+  tokenName: z.string(),
+  round: z.number().int().min(1),
+  from: imagePointSchema,
+  to: imagePointSchema,
+  costMeters: z.number().nonnegative(),
+  mode: z.string(),
+  overridden: z.boolean(),
+  undone: z.boolean(),
+  at: isoDateSchema,
+});
+export type MovementRecord = z.infer<typeof movementRecordSchema>;
+
+export const moveResultSchema = z.object({
+  token: tokenSchema,
+  /** Quanto è costato davvero, secondo il server. */
+  costMeters: z.number().nonnegative(),
+  /** Dove il percorso si è interrotto, se si è interrotto. */
+  stoppedBy: z.enum(['muro', 'terreno']).nullable(),
+  /** Stato del movimento dopo lo spostamento, quando c'è uno scontro in corso. */
+  remainingMeters: z.number().nonnegative().nullable(),
+  totalMeters: z.number().nonnegative().nullable(),
+  /** Il Game Master ha autorizzato oltre il budget. */
+  overridden: z.boolean(),
+  movementId: z.number().int().nonnegative().nullable(),
+});
+export type MoveResult = z.infer<typeof moveResultSchema>;
 
 /* --------------------------------- stato --------------------------------- */
 
