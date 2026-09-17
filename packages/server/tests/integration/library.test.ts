@@ -215,7 +215,10 @@ describe('caricamento di un pacchetto', () => {
         body: { ...PACK_HEADER, slug: 'dal-futuro', schemaVersion: 2 },
       }),
     );
-    expect(response.status).toBe(422);
+    // 400, non 422: il corpo non e proprio della forma attesa. Il 422 e per
+    // quello che e ben formato ma non si puo fare.
+    expect(response.status).toBe(400);
+    expect((response.body as { error: { code: string } }).error.code).toBe('invalid_input');
   });
 
   it('un file che non dichiara di essere un pacchetto viene rifiutato', async () => {
@@ -225,7 +228,7 @@ describe('caricamento di un pacchetto', () => {
         body: { ...PACK_HEADER, format: 'qualcos-altro' },
       }),
     );
-    expect(response.status).toBe(422);
+    expect(response.status).toBe(400);
   });
 
   it('solo il Game Master carica', async () => {
