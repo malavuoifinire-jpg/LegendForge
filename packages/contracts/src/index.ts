@@ -1,5 +1,8 @@
 import { z } from 'zod';
 import { MAX_ROTATION_DEG, MIN_CELL_SIZE_PX, RULESET_SCHEMA_VERSION } from '@legendforge/core';
+import { customFieldsSchema, libraryKindSchema, LIBRARY_SCHEMA_VERSION } from './library.js';
+
+export * from './library.js';
 
 /**
  * Versione dello schema dell'API pubblica e dei pacchetti di import/export.
@@ -673,6 +676,155 @@ export const updateGridInputSchema = gridConfigurationSchema.partial().extend({
   confirmed: z.boolean().optional(),
 });
 export type UpdateGridInput = z.infer<typeof updateGridInputSchema>;
+
+/* -------------------------------- libreria ------------------------------- */
+
+export const MAX_PACK_ENTRIES = 5000;
+
+const packSlugSchema = z
+  .string()
+  .trim()
+  .regex(/^[a-z0-9][a-z0-9-]{0,62}$/u, 'Lo slug usa lettere minuscole, cifre e trattini');
+
+export const contentPackSchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  slug: packSlugSchema,
+  name: z.string(),
+  packVersion: z.string(),
+  /** Identificativo della licenza, per esempio CC-BY-4.0. */
+  license: z.string(),
+  /** La frase di attribuzione richiesta dalla licenza, mostrata così com'è. */
+  attribution: z.string(),
+  sourceUrl: z.string().nullable(),
+  /** Un pacchetto ricevuto non si modifica sul posto. */
+  locked: z.boolean(),
+  entryCount: z.number().int().nonnegative(),
+});
+export type ContentPack = z.infer<typeof contentPackSchema>;
+
+export const libraryFolderSchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  kind: libraryKindSchema,
+  parentId: uuidSchema.nullable(),
+  name: z.string(),
+  sortOrder: z.number().int(),
+});
+export type LibraryFolder = z.infer<typeof libraryFolderSchema>;
+
+export const createFolderInputSchema = z.object({
+  kind: libraryKindSchema,
+  name: z.string().trim().min(1).max(120),
+  parentId: uuidSchema.nullable().optional(),
+  sortOrder: z.number().int().min(-10_000).max(10_000).optional(),
+});
+export type CreateFolderInput = z.infer<typeof createFolderInputSchema>;
+
+export const updateFolderInputSchema = z.object({
+  version: entityVersionSchema,
+  name: z.string().trim().min(1).max(120).optional(),
+  parentId: uuidSchema.nullable().optional(),
+  sortOrder: z.number().int().min(-10_000).max(10_000).optional(),
+});
+export type UpdateFolderInput = z.infer<typeof updateFolderInputSchema>;
+
+export const libraryEntrySchema = entityMetaSchema.extend({
+  campaignId: uuidSchema,
+  packId: uuidSchema.nullable(),
+  folderId: uuidSchema.nullable(),
+  kind: libraryKindSchema,
+  name: z.string(),
+  /** Il nome originale, quando la voce è stata tradotta. */
+  originalName: z.string().nullable(),
+  slug: z.string(),
+  /** Forma decisa dal tipo: vedi LIBRARY_DATA_SCHEMAS. */
+  data: z.unknown(),
+  custom: customFieldsSchema,
+  /** Vero se la voce arriva da un pacchetto bloccato e non si modifica. */
+  readOnly: z.boolean(),
+});
+export type LibraryEntry = z.infer<typeof libraryEntrySchema>;
+
+export const createEntryInputSchema = z.object({
+  kind: libraryKindSchema,
+  name: z.string().trim().min(1).max(200),
+  originalName: z.string().trim().max(200).nullable().optional(),
+  slug: z.string().trim().min(1).max(200).optional(),
+  folderId: uuidSchema.nullable().optional(),
+  data: z.unknown().optional(),
+  custom: customFieldsSchema.optional(),
+});
+export type CreateEntryInput = z.infer<typeof createEntryInputSchema>;
+
+export const updateEntryInputSchema = z.object({
+  version: entityVersionSchema,
+  name: z.string().trim().min(1).max(200).optional(),
+  originalName: z.string().trim().max(200).nullable().optional(),
+  folderId: uuidSchema.nullable().optional(),
+  data: z.unknown().optional(),
+  custom: customFieldsSchema.optional(),
+});
+export type UpdateEntryInput = z.infer<typeof updateEntryInputSchema>;
+
+/**
+ * Formato dei pacchetti, in ingresso e in uscita.
+ *
+ * La licenza e l'attribuzione non sono decorazioni: viaggiano con il
+ * contenuto, così chi lo riceve sa che cosa ha fra le mani e l'interfaccia può
+ * mostrarlo senza doverlo indovinare.
+ */
+export const packEntryFileSchema = z.object({
+  kind: libraryKindSchema,
+  name: z.string().trim().min(1).max(200),
+  originalName: z.string().trim().max(200).nullable().optional(),
+  slug: z.string().trim().min(1).max(200),
+  /** Percorso della cartella, per esempio "Incantesimi/Livello 3". */
+  folder: z.string().trim().max(400).optional(),
+  data: z.unknown().optional(),
+  custom: customFieldsSchema.optional(),
+});
+export type PackEntryFile = z.infer<typeof packEntryFileSchema>;
+
+export const contentPackFileSchema = z.object({
+  format: z.literal('legendforge-pack'),
+  schemaVersion: z.literal(LIBRARY_SCHEMA_VERSION),
+  slug: packSlugSchema,
+  name: z.string().trim().min(1).max(160),
+  packVersion: z.string().trim().min(1).max(40).default('1'),
+  license: z.string().trim().min(1).max(80),
+  attribution: z.string().trim().max(2000).default(''),
+  sourceUrl: z.string().trim().max(2000).nullable().optional(),
+  entries: z.array(packEntryFileSchema).max(MAX_PACK_ENTRIES),
+});
+export type ContentPackFile = z.infer<typeof contentPackFileSchema>;
+
+export const importPackInputSchema = z.object({
+  pack: contentPackFileSchema,
+  /** Se il pacchetto esiste già, ne aggiorna le voci invece di rifiutare. */
+  replaceExisting: z.boolean().default(false),
+  /** Le voci del pacchetto restano non modificabili. */
+  locked: z.boolean().default(true),
+});
+export type ImportPackInput = z.infer<typeof importPackInputSchema>;
+
+/**
+ * Esito di un caricamento.
+ *
+ * Una voce storta non ferma le altre: si dice quali sono state scartate e
+ * perché, invece di rifiutare un pacchetto intero per una virgola.
+ */
+export const importPackResultSchema = z.object({
+  pack: contentPackSchema,
+  created: z.number().int().nonnegative(),
+  updated: z.number().int().nonnegative(),
+  skipped: z.array(
+    z.object({
+      slug: z.string(),
+      kind: z.string(),
+      reason: z.string(),
+    }),
+  ),
+});
+export type ImportPackResult = z.infer<typeof importPackResultSchema>;
 
 /* --------------------------------- stato --------------------------------- */
 

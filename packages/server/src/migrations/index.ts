@@ -387,10 +387,100 @@ CREATE TABLE scene_exploration (
 ALTER TABLE scene_exploration ENABLE ROW LEVEL SECURITY;
 `;
 
+const LIBRARY = `
+-- Pacchetti di contenuti.
+--
+-- Un pacchetto è un'unità di provenienza: dice da dove arriva quello che
+-- contiene e con che licenza. È il modo in cui motore, dati e contenuti
+-- restano separati — il codice non sa nulla di nessun manuale, e un pacchetto
+-- si toglie senza riscrivere niente.
+CREATE TABLE content_packs (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id  uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  slug         text NOT NULL CHECK (slug ~ '^[a-z0-9][a-z0-9-]{0,62}$'),
+  name         text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 160),
+  pack_version text NOT NULL DEFAULT '1',
+  -- Identificativo della licenza, per esempio CC-BY-4.0, oppure 'proprio'.
+  license      text NOT NULL DEFAULT 'proprio' CHECK (char_length(license) <= 80),
+  -- La frase di attribuzione richiesta dalla licenza, mostrata così com'è.
+  attribution  text NOT NULL DEFAULT '' CHECK (char_length(attribution) <= 2000),
+  source_url   text CHECK (source_url IS NULL OR char_length(source_url) <= 2000),
+  -- Un pacchetto ricevuto non si modifica sul posto: per cambiarne una voce se
+  -- ne duplica una copia propria. Così quello che si riesporta è davvero
+  -- quello che si è ricevuto.
+  locked       boolean NOT NULL DEFAULT true,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  version      integer NOT NULL DEFAULT 1,
+  UNIQUE (campaign_id, slug)
+);
+
+-- Cartelle, una gerarchia per ogni tipo di libreria: la cartella degli
+-- incantesimi non è la cartella dei mostri.
+CREATE TABLE library_folders (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id  uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  kind         text NOT NULL,
+  parent_id    uuid REFERENCES library_folders(id) ON DELETE CASCADE,
+  name         text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 120),
+  sort_order   integer NOT NULL DEFAULT 0,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  version      integer NOT NULL DEFAULT 1
+);
+CREATE INDEX library_folders_campaign_idx ON library_folders (campaign_id, kind);
+
+-- Voci di libreria: incantesimi, mostri, oggetti, armi, classi, specie…
+--
+-- Una tabella sola con il tipo in una colonna, invece di una tabella per
+-- tipo. Le colonne fisse sono quelle su cui si cerca e si ordina; il resto
+-- sta in \`data\`, con una forma per tipo convalidata fuori dal database, e in
+-- \`custom\` per i campi che ciascuno si inventa. È quello che rende i
+-- contenuti dei dati e non dello schema: aggiungere un tipo non è una
+-- migrazione.
+CREATE TABLE library_entries (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  campaign_id  uuid NOT NULL REFERENCES campaigns(id) ON DELETE CASCADE,
+  pack_id      uuid REFERENCES content_packs(id) ON DELETE CASCADE,
+  folder_id    uuid REFERENCES library_folders(id) ON DELETE SET NULL,
+  kind         text NOT NULL,
+  -- Il nome nella lingua del tavolo e quello originale, quando non coincidono.
+  name         text NOT NULL CHECK (char_length(name) BETWEEN 1 AND 200),
+  original_name text CHECK (original_name IS NULL OR char_length(original_name) <= 200),
+  slug         text NOT NULL CHECK (char_length(slug) BETWEEN 1 AND 200),
+  data         jsonb NOT NULL DEFAULT '{}'::jsonb,
+  custom       jsonb NOT NULL DEFAULT '{}'::jsonb,
+  deleted_at   timestamptz,
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  updated_at   timestamptz NOT NULL DEFAULT now(),
+  version      integer NOT NULL DEFAULT 1
+);
+CREATE INDEX library_entries_browse_idx
+  ON library_entries (campaign_id, kind, name) WHERE deleted_at IS NULL;
+CREATE INDEX library_entries_folder_idx ON library_entries (folder_id) WHERE deleted_at IS NULL;
+CREATE INDEX library_entries_pack_idx ON library_entries (pack_id);
+-- Dentro un pacchetto lo slug identifica la voce: è quello che permette a un
+-- nuovo caricamento di aggiornare invece di duplicare.
+CREATE UNIQUE INDEX library_entries_pack_slug_unique
+  ON library_entries (pack_id, kind, slug) WHERE pack_id IS NOT NULL;
+
+-- Da quale voce di libreria nasce questo attore.
+--
+-- È una provenienza, non un legame: la pedina di un mostro è una copia
+-- indipendente, e ferirla non cambia il mostro sulla scheda.
+ALTER TABLE actors ADD COLUMN source_entry_id uuid REFERENCES library_entries(id) ON DELETE SET NULL;
+ALTER TABLE actors ADD COLUMN custom jsonb NOT NULL DEFAULT '{}'::jsonb;
+
+ALTER TABLE content_packs    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE library_folders  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE library_entries  ENABLE ROW LEVEL SECURITY;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init', sql: INIT },
   { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
   { name: '0003_join_codes', sql: JOIN_CODES },
   { name: '0004_vision', sql: VISION },
   { name: '0005_exploration', sql: EXPLORATION },
+  { name: '0006_library', sql: LIBRARY },
 ];
