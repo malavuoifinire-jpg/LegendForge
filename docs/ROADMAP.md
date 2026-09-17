@@ -128,12 +128,38 @@ dietro gli angoli; porte aperte e chiuse; scurovisione a 18 e 36 metri.
 incantesimi, campi personalizzati, import ed export JSON.
 
 **Accettazione**
-- [ ] Librerie separate per personaggi, mostri, oggetti, armi, incantesimi, effetti e scene
-- [ ] Ogni elemento si organizza in cartelle
-- [ ] Il Game Master crea un mostro da form, carica il token e lo salva nella cartella dei mostri
-- [ ] Classi, capacità, armi, incantesimi e oggetti sono entità modificabili, non un elenco fisso
-- [ ] Ogni attore ha i campi minimi previsti, più campi personalizzati
-- [ ] Export e import JSON con schema versionato; una versione sconosciuta viene rifiutata
+- [x] Librerie separate per personaggi, mostri, oggetti, armi, armature, incantesimi, classi, sottoclassi, specie, background e talenti
+- [x] Ogni elemento si organizza in cartelle, annidate e create dal pacchetto stesso
+- [~] Il Game Master crea un mostro e lo salva nella cartella dei mostri — **manca il caricamento dell'immagine della pedina**
+- [x] Classi, capacità, armi, incantesimi e oggetti sono entità modificabili, non un elenco fisso
+- [x] Ogni voce ha i campi minimi previsti dal suo tipo, più campi personalizzati liberi
+- [x] Export e import JSON con schema versionato; una versione sconosciuta viene rifiutata
+
+**Misure** — pacchetto SRD 5.2.1, 1014 voci, 1,46 MB, PostgreSQL locale:
+
+| | |
+|---|---|
+| Caricamento dal browser, file compreso | 1,3 s |
+| Voci rifiutate dalla convalida | 0 su 1014 |
+| Cartelle create automaticamente | 46 |
+| Esportazione completa | 45 ms |
+| Voci visibili a un giocatore | 685 su 1014 (i 329 mostri restano del Game Master) |
+
+**Contenuti e licenze**: nel repository entra solo materiale ridistribuibile.
+Il pacchetto SRD 5.2.1 è sotto CC BY 4.0, con l'attribuzione dentro il file e
+visibile nell'interfaccia. La catena delle modifiche è in `tools/srd/README.md`.
+
+**Resta fuori**, da riprendere più avanti:
+- L'immagine della pedina non si carica dalla libreria: le voci sono dati, non
+  ancora illustrazioni.
+- La libreria degli effetti grafici arriva con Milestone 6, insieme agli
+  effetti stessi.
+- I nomi italiani coprono 442 voci su 1014: mostri e oggetti magici restano
+  con il nome originale.
+- Le librerie sono per campagna: caricare lo stesso pacchetto in due campagne
+  duplica le righe. È una scelta, non una svista — tutto il modello di accesso
+  poggia sul fatto che ogni cosa appartiene a una campagna, e allargarlo per
+  risparmiare qualche centinaio di righe l'avrebbe indebolito.
 
 ---
 

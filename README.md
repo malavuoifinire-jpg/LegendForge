@@ -4,15 +4,18 @@ Virtual tabletop web per sessioni di gioco di ruolo online: un Game Master e fin
 a otto giocatori attorno alla stessa mappa, con griglia calibrata, campo visivo,
 illuminazione, pedine e combattimento a turni.
 
-> **Stato: Milestone 3 completa nel codice, in verifica in produzione.**
+> **Stato: Milestone 4 completa nel codice, in verifica in produzione.**
 > Accesso con PIN e codice di recupero, account indipendenti, codice di
 > campagna, inviti con link, personaggi assegnati. Caricamento mappe su storage
 > privato, rilevamento della griglia, calibrazione da due incroci, pedine
 > agganciate dal server, sincronizzazione fra browser diversi.
 > Muri, porte, finestre, campo visivo calcolato dal server, scurovisione,
 > sorgenti di luce, oscurità ambientale e fog of war a tre stati.
-> 250 test automatici, di cui 142 di integrazione su PostgreSQL reale, più i
-> flussi a due e tre partecipanti provati in browser veri.
+> Libreria dei contenuti con pacchetti, licenze e attribuzioni che viaggiano
+> insieme al materiale; il pacchetto SRD 5.2.1 sotto CC BY 4.0 porta 1014 voci
+> fra incantesimi, mostri, oggetti, classi e specie.
+> 299 test automatici, di cui la gran parte di integrazione su PostgreSQL
+> reale, più i flussi a due e tre partecipanti provati in browser veri.
 
 ## Principi
 
@@ -60,7 +63,7 @@ eseguibile anche fuori da Vercel.
 | 1 | Mappa, canvas con zoom e pan, griglia, pedina, persistenza | completata |
 | 2 | Campagne, inviti, PIN, permessi, sincronizzazione in tempo reale | completata |
 | 3 | Muri, porte, linea di vista, luci, oscurità, fog of war | completata |
-| 4 | Personaggi, mostri, oggetti, armi, incantesimi, librerie | da fare |
+| 4 | Personaggi, mostri, oggetti, armi, incantesimi, librerie | completata |
 | 5 | Iniziativa, turni, budget di movimento, diagonali, terreno | da fare |
 | 6 | Risoluzione delle azioni, dadi, aree d'effetto, effetti grafici | da fare |
 | 7 | Sicurezza, prestazioni, accessibilità, backup, audit log | da fare |

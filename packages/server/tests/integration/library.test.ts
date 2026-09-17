@@ -208,6 +208,26 @@ describe('caricamento di un pacchetto', () => {
     expect((await library(gmCookie)).total).toBe(0);
   });
 
+  it('uno schema di versione sconosciuta viene rifiutato', async () => {
+    const response = await harness.app.handle(
+      request('POST', `/api/campaigns/${campaignId}/packs`, {
+        cookie: gmCookie,
+        body: { ...PACK_HEADER, slug: 'dal-futuro', schemaVersion: 2 },
+      }),
+    );
+    expect(response.status).toBe(422);
+  });
+
+  it('un file che non dichiara di essere un pacchetto viene rifiutato', async () => {
+    const response = await harness.app.handle(
+      request('POST', `/api/campaigns/${campaignId}/packs`, {
+        cookie: gmCookie,
+        body: { ...PACK_HEADER, format: 'qualcos-altro' },
+      }),
+    );
+    expect(response.status).toBe(422);
+  });
+
   it('solo il Game Master carica', async () => {
     const player = await addPlayer();
     expect(
