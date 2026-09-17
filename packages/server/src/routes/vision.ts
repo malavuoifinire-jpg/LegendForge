@@ -21,7 +21,7 @@ import { emitSceneEvent, pruneSceneEvents } from '../events.js';
 import { HttpError, type Route } from '../http.js';
 import { parseBody } from '../validate.js';
 import { forgetExploration, rememberAndLoad } from '../exploration.js';
-import { controlLevel, toToken, type TokenRow } from './tokens.js';
+import { perceivesThrough, toToken, type TokenRow } from './tokens.js';
 import {
   computeViewpoints,
   loadLights,
@@ -115,14 +115,22 @@ export async function loadSceneVisionContext(
 export async function loadAllTokens(context: ServerContext, sceneId: string): Promise<Token[]> {
   const { rows } = await context.pool.query<TokenRow>(
     `SELECT id, scene_id, actor_id, name, x, y, size_in_cells, rotation_deg,
-            color, disposition, hidden, created_at, updated_at, version
+            color, disposition, hidden, controlled_by_game_master, created_at, updated_at, version
        FROM tokens WHERE scene_id = $1 ORDER BY created_at ASC`,
     [sceneId],
   );
   return rows.map(toToken);
 }
 
-/** Le pedine che questa persona muove: sono i suoi occhi sulla scena. */
+/**
+ * Le pedine attraverso cui questa persona guarda.
+ *
+ * Sono quelle che possiede, non quelle che comanda: un personaggio dominato
+ * continua a vedere quello che ha davanti, e chi lo possiede continua a
+ * guardare da lì anche mentre è il Game Master a muoverlo. Legare gli occhi al
+ * controllo avrebbe spento lo schermo a chi subisce un incantesimo, che è
+ * esattamente il momento in cui vuole vedere.
+ */
 export async function controlledTokens(
   context: ServerContext,
   userId: string,
@@ -131,8 +139,7 @@ export async function controlledTokens(
 ): Promise<Token[]> {
   const mine: Token[] = [];
   for (const token of tokens) {
-    const level = await controlLevel(context, userId, role, token.actorId);
-    if (level !== 'none') mine.push(token);
+    if (await perceivesThrough(context, userId, role, token)) mine.push(token);
   }
   return mine;
 }

@@ -33,6 +33,17 @@ export interface MovementRules {
   enforceBudget: boolean;
   /** Il Game Master può sempre autorizzare il superamento. */
   allowGameMasterOverride: boolean;
+  /**
+   * Il Game Master può spostare le pedine assegnate ai giocatori.
+   *
+   * Spenta, quelle pedine le muove solo chi le possiede: al Game Master
+   * restano tutte le altre facoltà — nasconderle, rinominarle, eliminarle —
+   * perché sono gestione della scena, non il personaggio di qualcun altro che
+   * cammina da solo. Per i casi in cui il controllo passa davvero di mano, per
+   * esempio un incantesimo di dominio, c'è l'apposito interruttore sulla
+   * singola pedina, che vince su questa regola.
+   */
+  gameMasterMovesPlayerTokens: boolean;
   /** Costo in metri di un tratto di salto, in attesa dell'automazione completa. */
   jumpSegmentCostMeters: number;
 }
@@ -73,6 +84,7 @@ export const DEFAULT_RULE_SET: RuleSet = {
     difficultTerrainMultiplier: 2,
     enforceBudget: true,
     allowGameMasterOverride: true,
+    gameMasterMovesPlayerTokens: true,
     jumpSegmentCostMeters: 1.5,
   },
   vision: {

@@ -8,8 +8,10 @@ import {
 } from '@legendforge/contracts';
 import {
   canTraverse,
+  mergeRuleSet,
   snapImagePointToFootprint,
   type GridConfiguration,
+  type RuleSet,
 } from '@legendforge/core';
 import { requireGameMaster, requireSceneAccess, requireTokenAccess } from '../access.js';
 import { requireViewer, type ServerContext } from '../context.js';
@@ -26,25 +28,103 @@ import { loadWalls, toWallSegment } from '../vision.js';
  *             ruotarlo, non rinominarlo, ridimensionarlo o nasconderlo.
  *  - `none` : chiunque altro.
  */
-export type ControlLevel = 'full' | 'move' | 'none';
+/**
+ * Quanto controllo ha chi guarda su una pedina.
+ *
+ *  - `full`   : tutto.
+ *  - `manage` : tutto tranne muoverla. È il Game Master su una pedina affidata
+ *               a un giocatore, quando la regola della campagna dice che il
+ *               movimento è cosa di chi la possiede. Nascondere, rinominare,
+ *               ridimensionare ed eliminare restano suoi: sono gestione della
+ *               scena, non il personaggio di qualcun altro che cammina da solo.
+ *  - `move`   : solo spostarla e ruotarla. È chi possiede il personaggio.
+ *  - `none`   : niente.
+ */
+export type ControlLevel = 'full' | 'manage' | 'move' | 'none';
+
+export interface TokenControl {
+  actorId: string | null;
+  /** Il controllo è passato al Game Master: dominio, confusione, possessione. */
+  controlledByGameMaster: boolean;
+}
+
+/** Le regole della campagna, con i valori mancanti riempiti dai default. */
+export async function campaignRules(
+  context: ServerContext,
+  campaignId: string,
+): Promise<RuleSet> {
+  const { rows } = await context.pool.query<{ rule_set: unknown }>(
+    'SELECT rule_set FROM campaigns WHERE id = $1',
+    [campaignId],
+  );
+  return mergeRuleSet(rows[0]?.rule_set as never);
+}
+
+async function ownsActor(
+  context: ServerContext,
+  actorId: string,
+  userId: string,
+): Promise<boolean> {
+  const { rows } = await context.pool.query(
+    'SELECT 1 FROM actor_ownership WHERE actor_id = $1 AND user_id = $2',
+    [actorId, userId],
+  );
+  return rows.length > 0;
+}
+
+async function actorIsAssigned(context: ServerContext, actorId: string): Promise<boolean> {
+  const { rows } = await context.pool.query(
+    'SELECT 1 FROM actor_ownership WHERE actor_id = $1 LIMIT 1',
+    [actorId],
+  );
+  return rows.length > 0;
+}
 
 export async function controlLevel(
   context: ServerContext,
   userId: string,
   role: string,
-  actorId: string | null,
+  token: TokenControl,
+  rules: RuleSet,
 ): Promise<ControlLevel> {
-  if (role === 'game_master') return 'full';
-  if (!actorId) return 'none';
-  const { rows } = await context.pool.query(
-    'SELECT 1 FROM actor_ownership WHERE actor_id = $1 AND user_id = $2',
-    [actorId, userId],
-  );
-  return rows.length > 0 ? 'move' : 'none';
+  // Il controllo preso vince su tutto il resto: è il caso per cui esiste.
+  if (token.controlledByGameMaster) {
+    return role === 'game_master' ? 'full' : 'none';
+  }
+  if (role === 'game_master') {
+    if (rules.movement.gameMasterMovesPlayerTokens) return 'full';
+    // Solo le pedine davvero affidate a qualcuno gli sfuggono di mano: un
+    // mostro resta suo anche con la regola spenta.
+    const assigned = token.actorId ? await actorIsAssigned(context, token.actorId) : false;
+    return assigned ? 'manage' : 'full';
+  }
+  if (!token.actorId) return 'none';
+  return (await ownsActor(context, token.actorId, userId)) ? 'move' : 'none';
+}
+
+/**
+ * Se chi guarda vede attraverso questa pedina.
+ *
+ * Non è la stessa domanda del controllo: un personaggio dominato continua a
+ * vedere quello che ha davanti, e chi lo possiede continua a guardare da lì
+ * anche mentre è il Game Master a muoverlo. Essere dominati non acceca.
+ */
+export async function perceivesThrough(
+  context: ServerContext,
+  userId: string,
+  role: string,
+  token: TokenControl,
+): Promise<boolean> {
+  if (role === 'game_master') return true;
+  if (!token.actorId) return false;
+  return ownsActor(context, token.actorId, userId);
 }
 
 /** Campi che chi ha solo il controllo del movimento può toccare. */
 const MOVEMENT_FIELDS = new Set(['version', 'x', 'y', 'rotationDeg', 'snapToGrid']);
+
+/** Campi che chi non può muovere la pedina non può toccare. */
+const POSITION_FIELDS = new Set(['x', 'y', 'rotationDeg', 'snapToGrid']);
 
 /**
  * Notifica la modifica di una pedina.
@@ -76,6 +156,7 @@ export interface TokenRow {
   color: string;
   disposition: TokenDisposition;
   hidden: boolean;
+  controlled_by_game_master: boolean;
   created_at: Date | string;
   updated_at: Date | string;
   version: number;
@@ -98,6 +179,7 @@ export function toToken(row: TokenRow): Token {
     color: row.color,
     disposition: row.disposition,
     hidden: row.hidden,
+    controlledByGameMaster: row.controlled_by_game_master ?? false,
     createdAt: toIso(row.created_at),
     updatedAt: toIso(row.updated_at),
     version: row.version,
@@ -106,7 +188,7 @@ export function toToken(row: TokenRow): Token {
 
 const SELECT_TOKEN = `
   SELECT id, scene_id, actor_id, name, x, y, size_in_cells, rotation_deg,
-         color, disposition, hidden, created_at, updated_at, version
+         color, disposition, hidden, controlled_by_game_master, created_at, updated_at, version
     FROM tokens`;
 
 async function gridOf(context: ServerContext, sceneId: string): Promise<GridConfiguration> {
@@ -206,10 +288,11 @@ export function tokenRoutes(context: ServerContext): Route[] {
         const position = place({ x: input.x, y: input.y }, grid, sizeInCells, input.snapToGrid);
 
         const { rows } = await context.pool.query<TokenRow>(
-          `INSERT INTO tokens (scene_id, actor_id, name, x, y, size_in_cells, color, disposition, hidden)
-           VALUES ($1, $9, $2, $3, $4, $5, $6, $7, $8)
+          `INSERT INTO tokens (scene_id, actor_id, name, x, y, size_in_cells, color, disposition,
+                               hidden, controlled_by_game_master)
+           VALUES ($1, $9, $2, $3, $4, $5, $6, $7, $8, $10)
            RETURNING id, scene_id, actor_id, name, x, y, size_in_cells, rotation_deg,
-                     color, disposition, hidden, created_at, updated_at, version`,
+                     color, disposition, hidden, controlled_by_game_master, created_at, updated_at, version`,
           [
             access.sceneId,
             input.name,
@@ -220,6 +303,7 @@ export function tokenRoutes(context: ServerContext): Route[] {
             input.disposition,
             input.hidden,
             actorId,
+            input.controlledByGameMaster,
           ],
         );
         const row = rows[0];
@@ -244,19 +328,36 @@ export function tokenRoutes(context: ServerContext): Route[] {
         const current = currentRows.rows[0];
         if (!current) throw new HttpError(404, 'not_found', 'Pedina non trovata');
 
-        const control = await controlLevel(context, viewer.id, access.role, current.actor_id);
+        const rules = await campaignRules(context, access.campaignId);
+        const control = await controlLevel(context, viewer.id, access.role, {
+          actorId: current.actor_id,
+          controlledByGameMaster: current.controlled_by_game_master,
+        }, rules);
         if (control === 'none') {
-          throw new HttpError(403, 'forbidden', 'Questa pedina non è sotto il tuo controllo');
+          const message = current.controlled_by_game_master
+            ? 'Questa pedina è sotto il controllo del Game Master'
+            : 'Questa pedina non è sotto il tuo controllo';
+          throw new HttpError(403, 'forbidden', message);
         }
+        const touched = Object.keys(request.body as Record<string, unknown>);
         if (control === 'move') {
-          const forbidden = Object.keys(request.body as Record<string, unknown>).filter(
-            (key) => !MOVEMENT_FIELDS.has(key),
-          );
+          const forbidden = touched.filter((key) => !MOVEMENT_FIELDS.has(key));
           if (forbidden.length > 0) {
             throw new HttpError(
               403,
               'forbidden',
               'Puoi spostare la pedina, non modificarne le proprietà',
+            );
+          }
+        }
+        if (control === 'manage') {
+          const forbidden = touched.filter((key) => POSITION_FIELDS.has(key));
+          if (forbidden.length > 0) {
+            throw new HttpError(
+              403,
+              'token_movement_reserved',
+              'Le regole di questa campagna lasciano il movimento a chi possiede il personaggio. ' +
+                'Per muoverla tu, prendine il controllo o cambia la regola.',
             );
           }
         }
@@ -299,10 +400,12 @@ export function tokenRoutes(context: ServerContext): Route[] {
                   color         = COALESCE($8, color),
                   disposition   = COALESCE($9, disposition),
                   hidden        = COALESCE($10, hidden),
+                  controlled_by_game_master = COALESCE($11, controlled_by_game_master),
                   updated_at = now(), version = version + 1
             WHERE id = $1 AND version = $2
         RETURNING id, scene_id, actor_id, name, x, y, size_in_cells, rotation_deg,
-                  color, disposition, hidden, created_at, updated_at, version`,
+                  color, disposition, hidden, controlled_by_game_master,
+                  created_at, updated_at, version`,
           [
             access.tokenId,
             input.version,
@@ -314,6 +417,7 @@ export function tokenRoutes(context: ServerContext): Route[] {
             input.color ?? null,
             input.disposition ?? null,
             input.hidden ?? null,
+            input.controlledByGameMaster ?? null,
           ],
         );
 

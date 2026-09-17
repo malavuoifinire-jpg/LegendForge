@@ -1,6 +1,7 @@
 import {
   createCampaignInputSchema,
   joinCampaignInputSchema,
+  updateRuleSetInputSchema,
   type Campaign,
   type CampaignRole,
 } from '@legendforge/contracts';
@@ -62,6 +63,57 @@ const SELECT_CAMPAIGNS = `
 
 export function campaignRoutes(context: ServerContext): Route[] {
   return [
+
+    {
+      /**
+       * Modifica delle regole della campagna.
+       *
+       * Le regole sono dati: si cambiano da qui, non ricompilando. Il parziale
+       * che arriva viene fuso sui valori attuali, così cambiare una casella non
+       * azzera tutto il resto.
+       */
+      method: 'PATCH',
+      pattern: '/api/campaigns/:campaignId/rules',
+      async handle({ request, params }) {
+        const viewer = await requireViewer(context, request);
+        const access = requireGameMaster(
+          await requireCampaignAccess(context, viewer, params.campaignId ?? ''),
+        );
+        const input = parseBody(updateRuleSetInputSchema, request.body);
+
+        const current = await context.pool.query<{ rule_set: unknown }>(
+          'SELECT rule_set FROM campaigns WHERE id = $1 AND deleted_at IS NULL',
+          [access.campaignId],
+        );
+        const before = mergeRuleSet(current.rows[0]?.rule_set as never);
+        const merged = mergeRuleSet({
+          ...before,
+          ...input.ruleSet,
+          grid: { ...before.grid, ...(input.ruleSet.grid ?? {}) },
+          movement: { ...before.movement, ...(input.ruleSet.movement ?? {}) },
+          vision: { ...before.vision, ...(input.ruleSet.vision ?? {}) },
+          units: { ...before.units, ...(input.ruleSet.units ?? {}) },
+        } as never);
+
+        const { rows } = await context.pool.query<{ version: number }>(
+          `UPDATE campaigns SET rule_set = $3::jsonb, updated_at = now(), version = version + 1
+            WHERE id = $1 AND version = $2 AND deleted_at IS NULL
+        RETURNING version`,
+          [access.campaignId, input.version, JSON.stringify(merged)],
+        );
+        if (rows.length === 0) {
+          throw new HttpError(409, 'version_conflict', 'La campagna è stata modificata altrove');
+        }
+
+        const updated = await context.pool.query<CampaignRow>(`${SELECT_CAMPAIGNS} AND c.id = $2`, [
+          viewer.id,
+          access.campaignId,
+        ]);
+        const row = updated.rows[0];
+        if (!row) throw new Error('campagna non leggibile dopo l aggiornamento');
+        return { status: 200, body: toCampaign(row) };
+      },
+    },
     {
       method: 'GET',
       pattern: '/api/campaigns',

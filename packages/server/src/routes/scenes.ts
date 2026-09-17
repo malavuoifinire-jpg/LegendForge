@@ -20,10 +20,10 @@ import {
   readSceneEvents,
   type EventVisibility,
 } from '../events.js';
-import { controlLevel } from './tokens.js';
 import { parseBody } from '../validate.js';
 import { SELECT_MAPS, SOURCE_URL_SECONDS, toMapAsset } from './maps.js';
 import { visibleTokensForViewer } from './vision.js';
+import { campaignRules, controlLevel } from './tokens.js';
 import type { SceneEvent } from '../events.js';
 
 interface SceneRow {
@@ -259,10 +259,14 @@ export function sceneRoutes(context: ServerContext): Route[] {
 
         // Quali pedine chi guarda può effettivamente muovere: lo dice il
         // server, così l'interfaccia non deve indovinarlo.
+        // Solo chi puo davvero spostarla: con `manage` il Game Master la
+        // gestisce ma non la muove, e lasciarla scivolare sotto il dito
+        // sarebbe una bugia che il server smentirebbe subito dopo.
+        const rules = await campaignRules(context, access.campaignId);
         const controllableTokenIds: string[] = [];
         for (const token of tokens) {
-          const level = await controlLevel(context, viewer.id, access.role, token.actorId);
-          if (level !== 'none') controllableTokenIds.push(token.id);
+          const level = await controlLevel(context, viewer.id, access.role, token, rules);
+          if (level === 'full' || level === 'move') controllableTokenIds.push(token.id);
         }
 
         const body: SceneDetail = {

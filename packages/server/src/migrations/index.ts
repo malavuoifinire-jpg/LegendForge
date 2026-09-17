@@ -476,6 +476,15 @@ ALTER TABLE library_folders  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE library_entries  ENABLE ROW LEVEL SECURITY;
 `;
 
+const TOKEN_CONTROL = `
+-- Il controllo di una pedina puo passare al Game Master.
+--
+-- Serve quando un personaggio finisce sotto un incantesimo di dominio: chi lo
+-- possiede smette di poterlo muovere. Sta sulla pedina e non sull'attore
+-- perche e una condizione di questa scena, non una proprieta del personaggio.
+ALTER TABLE tokens ADD COLUMN controlled_by_game_master boolean NOT NULL DEFAULT false;
+`;
+
 export const MIGRATIONS: Migration[] = [
   { name: '0001_init', sql: INIT },
   { name: '0002_invites_and_players', sql: INVITES_AND_PLAYERS },
@@ -483,4 +492,5 @@ export const MIGRATIONS: Migration[] = [
   { name: '0004_vision', sql: VISION },
   { name: '0005_exploration', sql: EXPLORATION },
   { name: '0006_library', sql: LIBRARY },
+  { name: '0007_token_control', sql: TOKEN_CONTROL },
 ];

@@ -66,6 +66,7 @@ export const ruleSetSchema = z.object({
     difficultTerrainMultiplier: z.number().min(1).max(10),
     enforceBudget: z.boolean(),
     allowGameMasterOverride: z.boolean(),
+    gameMasterMovesPlayerTokens: z.boolean(),
     jumpSegmentCostMeters: z.number().min(0),
   }),
   vision: z.object({
@@ -577,6 +578,15 @@ export const tokenSchema = entityMetaSchema.extend({
   color: hexColorSchema,
   disposition: tokenDispositionSchema,
   hidden: z.boolean(),
+  /**
+   * Il controllo è passato al Game Master.
+   *
+   * Serve quando un personaggio finisce sotto un incantesimo di dominio: chi
+   * lo possiede smette di poterlo muovere, il Game Master lo muove al posto
+   * suo. Continua però a vedere attraverso di lui — essere dominati non
+   * acceca.
+   */
+  controlledByGameMaster: z.boolean(),
 });
 export type Token = z.infer<typeof tokenSchema>;
 
@@ -591,6 +601,7 @@ export const createTokenInputSchema = z.object({
   color: hexColorSchema.optional(),
   disposition: tokenDispositionSchema.default('neutral'),
   hidden: z.boolean().default(false),
+  controlledByGameMaster: z.boolean().default(false),
   /** Se true il server aggancia la posizione alla griglia della scena. */
   snapToGrid: z.boolean().default(true),
 });
@@ -610,9 +621,17 @@ export const updateTokenInputSchema = z.object({
   color: hexColorSchema.optional(),
   disposition: tokenDispositionSchema.optional(),
   hidden: z.boolean().optional(),
+  controlledByGameMaster: z.boolean().optional(),
   snapToGrid: z.boolean().optional(),
 });
 export type UpdateTokenInput = z.infer<typeof updateTokenInputSchema>;
+
+/** Modifica delle regole della campagna: solo del Game Master. */
+export const updateRuleSetInputSchema = z.object({
+  version: entityVersionSchema,
+  ruleSet: ruleSetSchema.deepPartial(),
+});
+export type UpdateRuleSetInput = z.infer<typeof updateRuleSetInputSchema>;
 
 export const sceneSchema = entityMetaSchema.extend({
   campaignId: uuidSchema,
