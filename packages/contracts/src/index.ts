@@ -797,14 +797,30 @@ export const contentPackFileSchema = z.object({
 });
 export type ContentPackFile = z.infer<typeof contentPackFileSchema>;
 
-export const importPackInputSchema = z.object({
-  pack: contentPackFileSchema,
-  /** Se il pacchetto esiste già, ne aggiorna le voci invece di rifiutare. */
-  replaceExisting: z.boolean().default(false),
-  /** Le voci del pacchetto restano non modificabili. */
-  locked: z.boolean().default(true),
+/**
+ * Un pacchetto si carica a pezzi.
+ *
+ * Il file dello SRD pesa un megabyte e mezzo, e il corpo di una richiesta ne
+ * regge uno: prima si dichiara il pacchetto, poi le voci arrivano a mazzetti.
+ * Il vantaggio secondario è che il caricamento ha un avanzamento da mostrare
+ * invece di un'attesa muta.
+ */
+export const MAX_ENTRIES_PER_REQUEST = 250;
+
+export const createPackInputSchema = contentPackFileSchema
+  .omit({ entries: true })
+  .extend({
+    /** Se il pacchetto esiste già, ne sostituisce le voci invece di rifiutare. */
+    replaceExisting: z.boolean().default(false),
+    /** Le voci del pacchetto restano non modificabili. */
+    locked: z.boolean().default(true),
+  });
+export type CreatePackInput = z.infer<typeof createPackInputSchema>;
+
+export const addPackEntriesInputSchema = z.object({
+  entries: z.array(packEntryFileSchema).min(1).max(MAX_ENTRIES_PER_REQUEST),
 });
-export type ImportPackInput = z.infer<typeof importPackInputSchema>;
+export type AddPackEntriesInput = z.infer<typeof addPackEntriesInputSchema>;
 
 /**
  * Esito di un caricamento.
@@ -825,6 +841,16 @@ export const importPackResultSchema = z.object({
   ),
 });
 export type ImportPackResult = z.infer<typeof importPackResultSchema>;
+
+export const libraryPageSchema = z.object({
+  entries: z.array(libraryEntrySchema),
+  /** Quante voci soddisfano il filtro, al di là di quelle in questa pagina. */
+  total: z.number().int().nonnegative(),
+});
+export type LibraryPage = z.infer<typeof libraryPageSchema>;
+
+/** Quante voci per pagina: un elenco più lungo non si legge comunque. */
+export const LIBRARY_PAGE_SIZE = 100;
 
 /* --------------------------------- stato --------------------------------- */
 

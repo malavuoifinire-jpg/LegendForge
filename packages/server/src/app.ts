@@ -12,6 +12,7 @@ import { tokenRoutes } from './routes/tokens.js';
 import { inviteRoutes } from './routes/invites.js';
 import { actorRoutes } from './routes/actors.js';
 import { visionRoutes } from './routes/vision.js';
+import { libraryRoutes } from './routes/library.js';
 import type { ServerContext } from './context.js';
 import { ensureBucket, readStorageConfig, type BucketState } from './storage/supabase.js';
 import { SUPPORTED_MAP_MIME_TYPES } from '@legendforge/contracts';
@@ -75,6 +76,7 @@ export function createApp(env: ServerEnv, pool: DatabasePool | null): Router {
       ...inviteRoutes(context),
       ...actorRoutes(context),
       ...visionRoutes(context),
+      ...libraryRoutes(context),
     );
   }
 

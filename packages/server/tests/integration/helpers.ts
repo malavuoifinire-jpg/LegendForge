@@ -39,7 +39,9 @@ export async function createHarness(): Promise<TestHarness> {
       // svuota insieme alle altre: la riga singola va ricreata, altrimenti i
       // test partirebbero da uno stato che in produzione non esiste.
       await pool.query(`
-        TRUNCATE scene_events, scene_lights, scene_walls, tokens, actor_ownership, actors,
+        TRUNCATE scene_exploration, scene_events, scene_lights, scene_walls, tokens,
+                 library_entries, library_folders, content_packs,
+                 actor_ownership, actors,
                  grid_configurations,
                  scenes, map_assets, assets, invites, campaign_memberships, campaigns,
                  sessions, instance_state, users
