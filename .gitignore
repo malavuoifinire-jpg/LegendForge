@@ -41,3 +41,7 @@ Thumbs.db
 .idea/
 .vscode/*
 !.vscode/extensions.json
+
+# Cache di Python, prodotta dagli strumenti in tools/
+__pycache__/
+*.pyc
