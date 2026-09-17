@@ -10,10 +10,14 @@ interface CampaignScreenProps {
   onOpenScene: (scene: Scene) => void;
 }
 
-export function CampaignScreen({ campaign, onBack, onOpenScene }: CampaignScreenProps) {
+export function CampaignScreen({ campaign: initial, onBack, onOpenScene }: CampaignScreenProps) {
+  // La campagna arriva come proprietà ma le regole si cambiano da qui: la
+  // copia locale è quella che comanda finché si sta su questa schermata.
+  const [campaign, setCampaign] = useState<Campaign>(initial);
   const [scenes, setScenes] = useState<Scene[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const [savingRules, setSavingRules] = useState(false);
   const isGameMaster = campaign.viewerRole === 'game_master';
 
   const load = useCallback(async () => {
@@ -77,6 +81,48 @@ export function CampaignScreen({ campaign, onBack, onOpenScene }: CampaignScreen
             </li>
           ))}
         </ul>
+      )}
+
+      {isGameMaster && (
+        <section className="panel">
+          <header className="panel__header">
+            <h2>Regole del tavolo</h2>
+            <span className="badge">valgono per tutta la campagna</span>
+          </header>
+          <label className="switch">
+            <input
+              type="checkbox"
+              checked={campaign.ruleSet.movement.gameMasterMovesPlayerTokens}
+              disabled={savingRules}
+              onChange={(event) => {
+                const value = event.target.checked;
+                setSavingRules(true);
+                setError(null);
+                api
+                  .updateRules(campaign.id, {
+                    version: campaign.version,
+                    ruleSet: { movement: { gameMasterMovesPlayerTokens: value } },
+                  })
+                  .then(setCampaign)
+                  .catch((caught: unknown) =>
+                    setError(
+                      caught instanceof ApiError ? caught.message : 'Regola non salvata',
+                    ),
+                  )
+                  .finally(() => setSavingRules(false));
+              }}
+            />
+            <span>Posso spostare le pedine dei giocatori</span>
+          </label>
+          <p className="panel__hint">
+            {campaign.ruleSet.movement.gameMasterMovesPlayerTokens
+              ? 'Puoi trascinare qualsiasi pedina, anche quelle assegnate ai giocatori.'
+              : 'Le pedine assegnate le muovono solo i loro proprietari. A te restano tutte le ' +
+                'altre facoltà: nasconderle, rinominarle, eliminarle. Quando serve davvero — un ' +
+                'dominio, una possessione — puoi prendere il controllo di una singola pedina ' +
+                'dalla scena.'}
+          </p>
+        </section>
       )}
 
       {isGameMaster && (

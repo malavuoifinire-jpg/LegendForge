@@ -698,6 +698,18 @@ function drawToken(
   ctx.stroke();
   ctx.setLineDash([]);
 
+  // Una pedina il cui controllo e passato di mano porta un anello proprio:
+  // chi la possiede deve capire a colpo d'occhio perche non si muove.
+  if (token.controlledByGameMaster) {
+    ctx.beginPath();
+    ctx.arc(center.x, center.y, radius * 1.02, 0, Math.PI * 2);
+    ctx.setLineDash([3, 3]);
+    ctx.lineWidth = Math.max(2, radius * 0.1);
+    ctx.strokeStyle = '#c084fc';
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
   if (selected) {
     ctx.beginPath();
     ctx.arc(center.x, center.y, radius * 1.12, 0, Math.PI * 2);

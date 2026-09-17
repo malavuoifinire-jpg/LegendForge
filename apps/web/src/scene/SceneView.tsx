@@ -316,6 +316,27 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
     }
   }, []);
 
+  const toggleControl = useCallback(async (token: Token) => {
+    try {
+      const updated = await api.updateToken(token.id, {
+        version: token.version,
+        controlledByGameMaster: !token.controlledByGameMaster,
+      });
+      setScene((current) => {
+        if (!current) return current;
+        const tokens = current.tokens.map((candidate) =>
+          candidate.id === updated.id ? updated : candidate,
+        );
+        tokensRef.current = tokens;
+        return { ...current, tokens };
+      });
+      // Cambia chi può trascinare che cosa: lo dice il server, si rilegge.
+      await load();
+    } catch (caught) {
+      setError(caught instanceof ApiError ? caught.message : 'Controllo non cambiato');
+    }
+  }, [load]);
+
   const toggleHidden = useCallback(async (token: Token) => {
     try {
       const updated = await api.updateToken(token.id, {
@@ -797,6 +818,9 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
                     <span className="token__name">
                       {token.name}
                       {token.hidden && <span className="token__flag">nascosta</span>}
+                      {token.controlledByGameMaster && (
+                        <span className="token__flag">controllata dal GM</span>
+                      )}
                     </span>
                     <span className="token__size">
                       {token.sizeInCells}×{token.sizeInCells}
@@ -808,6 +832,13 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
 
             {selected && (
               <>
+                {selected.controlledByGameMaster && (
+                  <p className="panel__hint">
+                    {canEdit
+                      ? 'La stai controllando tu: chi la possiede non può muoverla, ma continua a vedere da qui.'
+                      : 'È sotto il controllo del Game Master. Continui a vedere da qui, ma non puoi muoverla.'}
+                  </p>
+                )}
                 <dl className="kv kv--compact">
                   <dt>Posizione</dt>
                   <dd className="kv__value">
@@ -829,6 +860,21 @@ export function SceneView({ sceneId, campaignId, onBack }: SceneViewProps) {
                     >
                       {selected.hidden ? 'Mostra ai giocatori' : 'Nascondi ai giocatori'}
                     </button>
+                    {selected.actorId && (
+                      <button
+                        type="button"
+                        className={
+                          selected.controlledByGameMaster
+                            ? 'panel__action panel__action--active'
+                            : 'panel__action'
+                        }
+                        onClick={() => void toggleControl(selected)}
+                      >
+                        {selected.controlledByGameMaster
+                          ? 'Restituisci il controllo'
+                          : 'Prendi il controllo'}
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="panel__action panel__action--danger"

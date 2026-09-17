@@ -27,6 +27,7 @@ import type {
   Token,
   UpdateGridInput,
   UpdateActorInput,
+  UpdateRuleSetInput,
   UpdateTokenInput,
   UploadTicket,
   Viewer,
@@ -112,6 +113,8 @@ export const api = {
   listCampaigns: () => request<Campaign[]>('/api/campaigns'),
   createCampaign: (input: CreateCampaignInput) => post<Campaign>('/api/campaigns', input),
   joinCampaign: (code: string) => post<Campaign>('/api/campaigns/join', { code }),
+  updateRules: (campaignId: string, input: UpdateRuleSetInput) =>
+    patch<Campaign>(`/api/campaigns/${campaignId}/rules`, input),
   rotateJoinCode: (campaignId: string) =>
     post<{ joinCode: string | null }>(`/api/campaigns/${campaignId}/join-code`, {}),
   joinWithInvite: (token: string) =>

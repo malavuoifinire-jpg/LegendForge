@@ -7,6 +7,8 @@ export interface CanvasToken {
   sizeInCells: number;
   color: string;
   hidden?: boolean;
+  /** Il controllo è passato al Game Master: dominio, possessione. */
+  controlledByGameMaster?: boolean;
 }
 
 /** Immagine di fondo della scena, con le sue dimensioni native. */
