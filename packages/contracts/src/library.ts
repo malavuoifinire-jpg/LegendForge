@@ -87,10 +87,14 @@ export const spellDataSchema = z.object({
   /** 0 è un trucchetto. */
   level: z.number().int().min(0).max(9),
   school: shortText.optional(),
-  castingTime: shortText.optional(),
+  /** Puo includere il grilletto di una reazione, che e lungo quanto serve. */
+  castingTime: z.string().trim().max(600).optional(),
   range: shortText.optional(),
-  /** Gittata in metri, quando è un numero: serve ai calcoli, non alla scheda. */
-  rangeMeters: z.number().nonnegative().max(100_000).nullable().optional(),
+  /**
+   * Gittata in metri, quando è un numero: serve ai calcoli, non alla scheda.
+   * Il tetto è alto perché esistono gittate di centinaia di chilometri.
+   */
+  rangeMeters: z.number().nonnegative().max(2_000_000).nullable().optional(),
   components: spellComponentsSchema.optional(),
   duration: shortText.optional(),
   concentration: z.boolean().default(false),
