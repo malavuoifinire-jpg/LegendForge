@@ -1129,7 +1129,15 @@ button {
   top: 12px;
 }
 
+.library__folders > div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
 .folder {
+  display: block;
+  width: 100%;
   text-align: left;
   background: transparent;
   color: var(--muted);

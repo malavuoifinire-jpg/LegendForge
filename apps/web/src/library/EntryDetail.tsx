@@ -171,7 +171,6 @@ const HEADLINE: Partial<Record<LibraryEntry['kind'], [string, string][]>> = {
     ['level', 'Livello'],
     ['school', 'Scuola'],
     ['castingTime', 'Tempo di lancio'],
-    ['range', 'Gittata'],
     ['duration', 'Durata'],
   ],
   monster: [
@@ -224,7 +223,14 @@ function EntrySummary({ entry }: { entry: LibraryEntry }) {
 
   const damage = data.damage as { dice?: string; type?: string } | undefined;
   if (damage?.dice) rows.push(['Danno', `${damage.dice} ${damage.type ?? ''}`.trim()]);
-  if (typeof data.rangeMeters === 'number') rows.push(['Gittata', `${data.rangeMeters} m`]);
+  // I metri sono l'unita del tavolo; l'originale sta fra parentesi per chi ha
+  // il manuale in inglese davanti.
+  const original = typeof data.range === 'string' ? data.range : null;
+  if (typeof data.rangeMeters === 'number') {
+    rows.push(['Gittata', original ? `${data.rangeMeters} m (${original})` : `${data.rangeMeters} m`]);
+  } else if (original) {
+    rows.push(['Gittata', original]);
+  }
   if (data.concentration === true) rows.push(['Concentrazione', 'sì']);
   if (data.ritual === true) rows.push(['Rituale', 'sì']);
   if (typeof data.savingThrow === 'string') rows.push(['Tiro salvezza', data.savingThrow]);
